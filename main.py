@@ -38,6 +38,7 @@ class MetallistProApp:
         self.init_detali_tab()
         self.init_metiz_tab()
         self.init_welding_tab()
+        self.init_insulation_tab()  # Новая отдельная вкладка
         
         # Фирменный официальный подвал разработчика
         footer = tk.Frame(root, bg="#2c3e50", height=32)
@@ -247,7 +248,7 @@ class MetallistProApp:
         left = ttk.LabelFrame(tab, text=" Элементы теплосетей (ГОСТ) ")
         left.pack(side="left", fill="both", expand=True, padx=15, pady=15)
         
-        ttk.Label(left, text="Тип детели:").pack(anchor="w", padx=10, pady=2)
+        ttk.Label(left, text="Тип детали:").pack(anchor="w", padx=10, pady=2)
         self.det_type = ttk.Combobox(left, values=["Отвод 90° ГОСТ 17375-2001", "Переход ГОСТ 17378-2001", "Фланец ГОСТ 33259-2015"], state="readonly")
         self.det_type.set("Отвод 90° ГОСТ 17375-2001"); self.det_type.pack(fill="x", padx=10, pady=4)
         self.det_type.bind("<<ComboboxSelected>>", self.on_det_type_change)
@@ -289,7 +290,7 @@ class MetallistProApp:
                 "Ду150": 8.1, "Ду200": 17.2, "Ду250": 33.5, "Ду300": 51.4,
                 "Ду400": 98.6, "Ду500": 173.0
             }
-            # Парсинг ключа
+            # Точный парсинг ключа Ду из строки combobox
             key = dy.split(" ")[0]
             base_w = weights_map.get(key, 8.1)
         else:
@@ -316,7 +317,7 @@ class MetallistProApp:
         
         self.len_frame = ttk.Frame(left); self.len_frame.pack(fill="x", padx=10, pady=2)
         ttk.Label(self.len_frame, text="Длина (L), мм:").pack(anchor="w")
-        self.metiz_l = ttk.Entry(self.len_frame); self.metiz_l.insert(0, "40"); self.metiz_l.pack(fill="x", pady=2)
+        self.metiz_l = ttk.Entry(self.len_frame); self.metiz_l.insert(0, "40"); self.len_frame.pack(fill="x", pady=2)
         
         self.extra_frame = ttk.Frame(left); self.extra_frame.pack(fill="x", padx=10, pady=4)
         ttk.Label(self.extra_frame, text="Класс прочности:").grid(row=0, column=0, sticky="w", pady=2)
@@ -384,119 +385,134 @@ class MetallistProApp:
         self.metiz_info.config(state="normal"); self.metiz_info.delete("1.0", tk.END); self.metiz_info.insert("1.0", report); self.metiz_info.config(state="disabled")
     def init_welding_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="⚡ Сварка и Изоляция")
+        self.notebook.add(tab, text="⚡ Сварка")
         
-        inputs = ttk.LabelFrame(tab, text=" Параметры сварочных швов и теплоизоляции ")
-        inputs.pack(fill="x", padx=15, pady=5)
+        inputs = ttk.LabelFrame(tab, text=" Параметры сварочных швов по ГОСТ ")
+        inputs.pack(fill="x", padx=15, pady=10)
         
-        # Переключатель типа изоляции по вашей технологической схеме
-        ttk.Label(inputs, text="Тип изоляции трубопровода:").grid(row=0, column=0, padx=5, pady=6, sticky="w")
+        ttk.Label(inputs, text="Геометрия стыка:").grid(row=0, column=0, padx=5, pady=6, sticky="w")
+        self.weld_geom = ttk.Combobox(inputs, values=["Трубный стык ГОСТ 16037", "Плоский шов ГОСТ 5264-80 (1 метр)"], state="readonly", width=26)
+        self.weld_geom.set("Трубный стык ГОСТ 16037"); self.weld_geom.grid(row=0, column=1, padx=5, pady=6, sticky="w")
+        
+        ttk.Label(inputs, text="Толщина стенки стали s, мм:").grid(row=0, column=2, padx=5, pady=6, sticky="w")
+        self.weld_pipe_s = ttk.Entry(inputs, width=12); self.weld_pipe_s.insert(0, "6"); self.weld_pipe_s.grid(row=0, column=3, padx=5, pady=6, sticky="w")
+        
+        ttk.Label(inputs, text="Тип шва (ГОСТ):").grid(row=1, column=0, padx=5, pady=6, sticky="w")
+        self.weld_joint_type = ttk.Combobox(inputs, values=["С2 (Стыковое)", "С17 (V-раздел)", "С21 (X-раздел)"], state="readonly", width=20)
+        self.weld_joint_type.set("С17 (V-раздел)"); self.weld_joint_type.grid(row=1, column=1, padx=5, pady=6, sticky="w")
+        
+        ttk.Label(inputs, text="Метод сварки:").grid(row=1, column=2, padx=5, pady=6, sticky="w")
+        self.weld_method = ttk.Combobox(inputs, values=["Ручная дуговая (ММА)", "Полуавтомат (MIG/MAG)"], state="readonly", width=18)
+        self.weld_method.set("Ручная дуговая (ММА)"); self.weld_method.grid(row=1, column=3, padx=5, pady=6, sticky="w")
+        
+        ttk.Button(inputs, text="⚡ Рассчитать расход сварочных материалов", command=self.calculate_only_welding, width=45).grid(row=2, column=0, columnspan=2, pady=10, padx=5, sticky="ew")
+        
+        self.weld_only_output = tk.Text(tab, bg="#ffffff", font=("Courier", 10), height=14, bd=1, relief="solid")
+        self.weld_only_output.pack(fill="both", expand=True, padx=15, pady=10)
+
+    def calculate_only_welding(self):
+        try:
+            s = float(self.weld_pipe_s.get()); joint = self.weld_joint_type.get(); method = self.weld_method.get(); w_geom = self.weld_geom.get()
+            line_length_m = 0.50 if "Трубный" in w_geom else 1.0
+            area = (s * 1.5 + 3) if "С2" in joint else ((s**2) * 0.6)
+            mass_dep = (area * line_length_m * 7.85) / 1000
+            
+            if "Полуавтомат" in method:
+                w_mat = mass_dep * 1.12; gas_liters = line_length_m * 220
+                res = f"⚡ ВЕДОМОСТЬ СВАРКИ MIG/MAG:\n----------------------------------------\n• Конструкция: {w_geom} ({joint})\n• Расход сварочной проволоки: {w_mat:.3f} кг\n• Защитный газ CO2: {gas_liters:.1f} л\n"
+            else:
+                res = f"⚡ ВЕДОМОСТЬ СВАРКИ MMA:\n----------------------------------------\n• Конструкция: {w_geom} ({joint})\n• Расход электродов с огарками: {mass_dep * 1.62:.3f} кг\n"
+        except Exception: res = "❌ Ошибка параметров сварки!"
+        self.weld_only_output.delete("1.0", tk.END); self.weld_only_output.insert("1.0", res)
+
+    def init_insulation_tab(self):
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text="环 Изоляция")
+        
+        inputs = ttk.LabelFrame(tab, text=" Геометрический расчет объемов теплоизоляции по схеме ")
+        inputs.pack(fill="x", padx=15, pady=10)
+        
+        ttk.Label(inputs, text="Тип прокладки сети:").grid(row=0, column=0, padx=5, pady=6, sticky="w")
         self.iso_calc_type = ttk.Combobox(inputs, values=["Одна труба", "Несколько труб (Группа в оболочке)"], state="readonly", width=30)
         self.iso_calc_type.set("Одна труба"); self.iso_calc_type.grid(row=0, column=1, padx=5, pady=6, sticky="w")
         self.iso_calc_type.bind("<<ComboboxSelected>>", self.on_iso_calc_type_change)
         
-        # Динамический контейнер параметров теплоизоляции СГК
         self.iso_inputs_frame = ttk.Frame(inputs)
         self.iso_inputs_frame.grid(row=1, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
         self.iso_entries = {}
         
-        # Поля швов
-        w_frame = ttk.Frame(inputs); w_frame.grid(row=2, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
-        ttk.Label(w_frame, text="Толщина стенки стали s, мм:").pack(side="left", padx=2)
-        self.weld_pipe_s = ttk.Entry(w_frame, width=8); self.weld_pipe_s.insert(0, "6"); self.weld_pipe_s.pack(side="left", padx=5)
+        btn_frame = ttk.Frame(inputs); btn_frame.grid(row=2, column=0, columnspan=4, pady=10, sticky="ew")
+        ttk.Button(btn_frame, text="⚡ Рассчитать геометрические объемы изоляции", command=self.calculate_only_insulation, width=45).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="💾 Экспорт ведомости в файл", command=self.export_iso_report, width=45).pack(side="right", padx=5)
         
-        ttk.Label(w_frame, text="Тип шва:").pack(side="left", padx=5)
-        self.weld_joint_type = ttk.Combobox(w_frame, values=["С2 (Стыковое)", "С17 (V-раздел)", "С21 (X-раздел)"], state="readonly", width=15)
-        self.weld_joint_type.set("С17 (V-раздел)"); self.weld_joint_type.pack(side="left", padx=5)
-        
-        btn_frame = ttk.Frame(inputs); btn_frame.grid(row=3, column=0, columnspan=4, pady=10, sticky="ew")
-        ttk.Button(btn_frame, text="⚡ Рассчитать расход материалов и изоляцию", command=self.calculate_pipe_welding, width=45).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="💾 Сохранить спецификацию в файл", command=self.export_report_to_file, width=45).pack(side="right", padx=5)
-        
-        self.weld_output = tk.Text(tab, bg="#ffffff", font=("Courier", 10), height=14, bd=1, relief="solid"); self.weld_output.pack(fill="both", expand=True, padx=15, pady=10)
+        self.iso_output = tk.Text(tab, bg="#ffffff", font=("Courier", 10), height=14, bd=1, relief="solid")
+        self.iso_output.pack(fill="both", expand=True, padx=15, pady=10)
         self.on_iso_calc_type_change()
 
     def on_iso_calc_type_change(self, event=None):
         for w in self.iso_inputs_frame.winfo_children(): w.destroy()
         self.iso_entries.clear()
         itype = self.iso_calc_type.get()
-        
         if itype == "Одна труба":
             fields = [("Диаметр трубы D, м", "0.125"), ("Толщина изоляции t, м", "0.08"), ("Длина участка L, м", "130")]
-        else: # Несколько труб (Группа по чертежу)
-            fields = [("Диаметр крайних D1, м", "0.108"), ("Диаметр средних D2, м", "0.076"), ("Толщина изоляции t, м", "0.1"), ("Расстояние между труб p, м", "0.1"), ("Длина участка L, м", "65")]
-            
+        else:
+            fields = [("Диаметр крайних D1, м", "0.108"), ("Диаметр средних D2, м", "0.076"), ("Толщина изоляции t, м", "0.1"), ("Зазор труб p, м", "0.1"), ("Длина участка L, м", "65")]
         for idx, (lbl, val) in enumerate(fields):
             ttk.Label(self.iso_inputs_frame, text=lbl).grid(row=0, column=idx*2, padx=4, pady=4, sticky="w")
             e = ttk.Entry(self.iso_inputs_frame, width=10); e.insert(0, val); e.grid(row=0, column=idx*2+1, padx=4, pady=4)
             self.iso_entries[lbl] = e
 
-    def calculate_pipe_welding(self):
+    def calculate_only_insulation(self):
         try:
-            s_w = float(self.weld_pipe_s.get()); joint = self.weld_joint_type.get(); itype = self.iso_calc_type.get()
-            
+            itype = self.iso_calc_type.get()
             if itype == "Одна труба":
                 D = float(self.iso_entries["Диаметр трубы D, м"].get())
                 t = float(self.iso_entries["Толщина изоляции t, м"].get())
                 L = float(self.iso_entries["Длина участка L, м"].get())
-                
-                # Точные формулы с электронной библиотеки сметчика на чертеже
                 S_r = math.pi * D * L
                 S_pi = math.pi * (D + 2 * t) * L
                 V_i = (math.pi / 4) * (((D + 2 * t) ** 2) - (D ** 2)) * L
                 
-                report = (
-                    f"📝 ТЕХНОЛОГИЧЕСКАЯ ВЕДОМОСТЬ ТЕПЛОИЗОЛЯЦИИ СГК (ОДНА ТРУБА):\n"
+                self.iso_report_data = (
+                    f"📝 ВЕДОМОСТЬ ОБЪЕМОВ ИЗОЛЯЦИОННЫХ РАБОТ СГК (ОДНОТРУБНЫЙ УЧАСТОК):\n"
                     f"--------------------------------------------------\n"
-                    f"• Исходные данные: D = {D:.3f} м; t = {t:.3f} м; L = {L:.1f} м\n"
-                    f"--------------------------------------------------\n"
-                    f"▶ Площадь обертывания трубы (окраски) Sr:  {S_r:.6f} м²\n"
-                    f"▶ Площадь покровного слоя изоляции Spi:    {S_pi:.6f} м²\n"
-                    f"▶ ИТОГОВЫЙ ОБЪЕМ ИЗОЛЯЦИИ Vi:              {V_i:.6f} м³\n"
+                    f"▶ Площадь обертывания (окраски) Sr:        {S_r:.6f} м²\n"
+                    f"▶ Площадь покровного слоя Spi:             {S_pi:.6f} м²\n"
+                    f"▶ ИТОГОВЫЙ ОБЪЕМ ТЕПЛОИЗОЛЯЦИИ Vi:         {V_i:.6f} м³\n"
                 )
-            else: # Несколько труб в общей изоляции
+            else:
                 D1 = float(self.iso_entries["Диаметр крайних D1, м"].get())
                 D2 = float(self.iso_entries["Диаметр средних D2, м"].get())
                 t = float(self.iso_entries["Толщина изоляции t, м"].get())
-                p = float(self.iso_entries["Расстояние между труб p, м"].get())
+                p = float(self.iso_entries["Зазор труб p, м"].get())
                 L = float(self.iso_entries["Длина участка L, м"].get())
-                
-                # Геометрия сложного овального контура по ГОСТ спецификации
                 M = D1 + D2 + (p * 2)
                 B = (D1 * 2) + D2 + (p * 2) + (t * 2)
-                
                 S_r = ((math.pi * D1) + (M * 2)) * L
                 S_pi = ((math.pi * (D1 + 2 * t)) + (M * 2)) * L
                 V_i = (((math.pi / 4) * ((D1 + 2 * t) ** 2 - D1 ** 2)) + (M * 2 * t)) * L
                 
-                report = (
-                    f"📝 ТЕХНОЛОГИЧЕСКАЯ ВЕДОМОСТЬ ТЕПЛОИЗОЛЯЦИИ СГК (НЕСКОЛЬКО ТРУБ):\n"
+                self.iso_report_data = (
+                    f"📝 ВЕДОМОСТЬ ОБЪЕМОВ ИЗОЛЯЦИОННЫХ РАБОТ СГК (ГРУППОВАЯ ОСЬ):\n"
                     f"--------------------------------------------------\n"
-                    f"• Исходные данные: D1={D1:.3f}м; D2={D2:.3f}м; t={t:.3f}м; p={p:.3f}м; L={L:.1f}м\n"
-                    f"• Расчетные параметры: Габарит B = {B:.3f} м | Периметр осей M = {M:.3f} м\n"
+                    f"• Габаритная ширина блока B:               {B:.3f} м\n"
                     f"--------------------------------------------------\n"
-                    f"▶ Площадь обертывания труб (окраски) Sr:   {S_r:.6f} м²\n"
-                    f"▶ Площадь покровного слоя изоляции Spi:    {S_pi:.6f} м²\n"
-                    f"▶ ИТОГОВЫЙ ОБЪЕМ ИЗОЛЯЦИИ Vi:              {V_i:.6f} м³\n"
+                    f"▶ Площадь обертывания (окраски) Sr:        {S_r:.6f} м²\n"
+                    f"▶ Площадь покровного слоя Spi:             {S_pi:.6f} м²\n"
+                    f"▶ ИТОГОВЫЙ ОБЪЕМ ТЕПЛОИЗОЛЯЦИИ Vi:         {V_i:.6f} м³\n"
                 )
-                
-            # Добавляем базовый ориентировочный расчет наплавки шва
-            area_w = (s_w * 1.5 + 3) if "С2" in joint else ((s_w**2) * 0.6)
-            report += f"--------------------------------------------------\n• Справочный расход электродов MMA (на 1 стык): {(area_w * 0.50 * 7.85 / 1000) * 1.62:.3f} кг\n"
-            self.last_report = report
-        except Exception as e: self.last_report = f"❌ Ошибка параметров изоляции: {e}"
-        self.weld_output.delete("1.0", tk.END); self.weld_output.insert("1.0", self.last_report)
+        except Exception as e: self.iso_report_data = f"❌ Ошибка: {e}"
+        self.iso_output.delete("1.0", tk.END); self.iso_output.insert("1.0", self.iso_report_data)
 
-    def export_report_to_file(self):
-        if not hasattr(self, 'last_report') or "❌" in self.last_report:
-            messagebox.showwarning("Внимание", "Сначала произведите расчет!"); return
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Текстовые файлы", "*.txt")], title="Сохранить ведомость изоляции")
+    def export_iso_report(self):
+        if not hasattr(self, 'iso_report_data') or "❌" in self.iso_report_data:
+            messagebox.showwarning("Внимание", "Нет данных для экспорта!"); return
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Текстовые файлы", "*.txt")])
         if file_path:
             with open(file_path, "w", encoding="utf-8") as f:
-                f.write(self.last_report)
-                f.write("\n--------------------------------------------------\n")
-                f.write("Спецификация сформирована: сметная группа г.Назарово ООО \"СГК\" 2026г.\n")
-            messagebox.showinfo("Успех", "Ведомость изоляционных работ успешно выгружена!")
+                f.write(self.iso_report_data)
+                f.write("\n\nСметная группа г.Назарово ООО \"СГК\" 2026г. версия 1\n")
+            messagebox.showinfo("Успех", "Отчет изоляции успешно выгружен!")
 
 if __name__ == "__main__":
     root = tk.Tk()
