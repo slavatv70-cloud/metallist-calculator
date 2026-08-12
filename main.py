@@ -42,7 +42,7 @@ class MetallistProApp:
         self.init_designation_tab()    
         self.init_insulation_tab()
         
-        # Фирменный официальный подвал разработчика
+        # Фирменный официальный подвал разработчика (Крупный и Оранжевый)
         footer = tk.Frame(root, bg="#2c3e50", height=32)
         footer.pack(fill="x", side="bottom", pady=(5, 0))
         footer_text = "Разработчик Тищенко Вячеслав Владимирович, сметная группа г.Назарово ООО \"СГК\" 2026г. версия 1"
@@ -58,7 +58,6 @@ class MetallistProApp:
         if "Нержавеющая" in mat: return 7.92
         elif "Медь" in mat: return 8.94
         return 7.85
-
     def init_geometry_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="📐 Геометрия")
@@ -135,7 +134,6 @@ class MetallistProApp:
                 res += f"Площадь сечения: {(math.sqrt(3)/2)*(S**2):.2f} мм²\nВес заготовки: {((math.sqrt(3)/2)*(S**2)*L*rho)/1000000:.3f} кг\n"
         except Exception as e: res += f"Ошибка: {str(e)}"
         self.geom_result.config(state="normal"); self.geom_result.delete("1.0", tk.END); self.geom_result.insert("1.0", res); self.geom_result.config(state="disabled")
-
     def init_sortament_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="📊 Сортамент")
@@ -186,7 +184,6 @@ class MetallistProApp:
         total = float(val[1]) * (rho / 7.85) * L
         res = f"📊 РЕЗУЛЬТАТ РАСЧЕТА СОРТАМЕНТА:\n• Профиль: {prof} ({val[0]})\n• Расчетная длина: {L} м\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС ПАРТИИ: {total:.3f} кг\n"
         self.sort_output.delete("1.0", tk.END); self.sort_output.insert("1.0", res)
-
     def init_detali_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="🔧 Детали трубопроводов")
@@ -249,7 +246,6 @@ class MetallistProApp:
         if self.kit_check_var.get(): w_one += 0.08
         self.metiz_info.delete("1.0", "end")
         self.metiz_info.insert("1.0", f"🔩 СПЕЦИФИКАЦИЯ КРЕПЕЖНЫХ ИЗДЕЛИЙ:\n• {t} {d}\n• Количество: {int(c)} шт\n▶ ИТОГОВЫЙ МАССОВЫЙ ВЕС: {w_one * c:.3f} кг\n")
-
     def init_welding_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="⚡ Сварка")
@@ -288,14 +284,14 @@ class MetallistProApp:
         
         ttk.Button(in_box, text="Считать", command=self.process_gost_welding_calculations).grid(row=4, column=1, padx=5, pady=5, sticky="e")
         
-        # 2. Средняя панель: Электроды и Проволока (Строго по схеме сметы)
+        # 2. Средняя панель: Электроды и Проволока (Связанная база скриншотов)
         mid_f = ttk.Frame(tab)
         mid_f.pack(fill="x", padx=15, pady=5)
         
         el_box = ttk.LabelFrame(mid_f, text=" Электроды ")
         el_box.pack(fill="x", pady=2)
         
-        # СВЯЗАННЫЙ СПРАВОЧНИК ВНУТРИ ВКЛАДКИ СВАРКА
+        # Связанный интерактивный справочник внутри вкладки Сварка
         self.w_el_cat = ttk.Combobox(el_box, values=["Углеродистая и низколегированная сталь", "Легированная конструкционная сталь", "Теплоустойчивая сталь по ГОСТ 9467"], state="readonly", width=38)
         self.w_el_cat.set("Углеродистая и низколегированная сталь"); self.w_el_cat.pack(side="left", padx=10, pady=5)
         self.w_el_cat.bind("<<ComboboxSelected>>", self.sync_welding_tab_electrodes)
@@ -340,7 +336,6 @@ class MetallistProApp:
             marks = ["ЦЛ-6", "ЦУ-2М", "ТМЛ-1", "ТМЛ-3У", "ЦЛ-39", "ЦЛ-40"]
         self.w_el_mark['values'] = marks
         self.w_el_mark.set(marks[0])
-
     def rebuild_weld_grid(self, event=None):
         for w in self.dyn_grid_frame.winfo_children(): w.destroy()
         self.w_inputs.clear()
@@ -427,7 +422,6 @@ class MetallistProApp:
             self.out_pr_mass.insert(0, f"{m_dep * 1.12:.3f}")
         except Exception:
             messagebox.showerror("Ошибка", "Пропустили поле или ввели некорректные буквы шва!")
-
     def init_electrodes_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="📖 Справочник электродов")
@@ -463,22 +457,22 @@ class MetallistProApp:
         if idx == 0:
             mar = ["ТМУ-21У", "ОЗС-41", "«Огонек»", "АНО-4", "АНО-6", "УОНИ-13/55", "МР-3"]
             txt = "ТМУ-21У, ОЗС-41, «Огонек», АНО-4, АНО-6, УОНИ-13/45, УОНИ-13/55, МР-3"
-            desc = "ГОСТ 9467: Типы Э42, Э46. Для ручной дуговой сварки особо ответственных конструкций из углеродистых сталей. Обеспечивают высокую ударную вязкость шва теплосетей."
+            desc = "ГОСТ 9467: Типы Э42, Э46. Для ручной дуговой сварки ответственных конструкций из углеродистых сталей."
         elif idx == 1:
             mar = ["АНО-ТМ70", "АНП-1", "УОНИ-13/85", "ЦЛ-18", "ЦЛ-19"]
             txt = "АНО-ТМ70, АНП-1, АНП-2, УОНИ-13/85, ЦЛ-18, ЦЛ-19"
-            desc = "Для сварки легированных конструкционных сталей повышенной и высокой прочности. Обеспечивают сопротивляемость к образованию трещин при монтаже крупных металлоконструкций."
+            desc = "Для сварки легированных конструкционных сталей повышенной и высокой прочности."
         else:
             mar = ["ЦЛ-6", "ЦУ-2М", "ТМЛ-1", "ТМЛ-3У", "ЦЛ-39"]
             txt = "ЦЛ-6, ЦУ-2М, УОНИ-13ХМ, ТМЛ-1, ТМЛ-3У, ЦЛ-39, ЦЛ-36, ЦЛ-40"
-            desc = "ГОСТ 9467: Типы Э-09Х1М, Э-09Х1МФ. Для сварки элементов котельного оборудования и паропроводов тепловых сетей ТЭЦ, работающих при высоких температурах до 565°С."
+            desc = "ГОСТ 9467: Типы Э-09Х1М, Э-09Х1МФ. Для сварки элементов котельного оборудования и паропроводов тепловых сетей ТЭЦ."
         for m in mar: self.el_mark_box.insert("end", m)
         self.el_all_text.delete("1.0", "end"); self.el_all_text.insert("1.0", txt)
         self.el_desc_text.delete("1.0", "end"); self.el_desc_text.insert("1.0", desc)
 
     def init_designation_tab(self):
         tab = ttk.Frame(self.notebook); self.notebook.add(tab, text="📝 Обозначение швов (ГОСТ)")
-        ttk.Label(tab, text="Структура условного обозначения стандартного сварного шва по ГОСТ 2.312-72", font=("Segoe UI", 11, "bold"), fg="#8e44ad").pack(pady=10, anchor="w", padx=20)
+        tk.Label(tab, text="Структура условного обозначения стандартного сварного шва по ГОСТ 2.312-72", font=("Segoe UI", 11, "bold"), fg="#8e44ad").pack(pady=10, anchor="w", padx=20)
         f_arrow = ttk.LabelFrame(tab, text=" 📊 Схема расположения знаков на линии выноски чертежа "); f_arrow.pack(fill="x", padx=20, pady=5)
         f_fields = ttk.Frame(f_arrow); f_fields.pack(pady=10)
         for i in range(1, 7):
@@ -486,7 +480,7 @@ class MetallistProApp:
             e = ttk.Entry(f_fields, width=7, justify="center"); e.insert(0, f"[{i}]"); e.pack(side="left", padx=2)
         f_znaki = ttk.LabelFrame(tab, text=" Вспомогательные технологические знаки (Поле 6) "); f_znaki.pack(fill="x", padx=20, pady=5)
         f_r = ttk.Frame(f_znaki); f_r.pack(pady=8)
-        for z in ["𝓞 По замкнутому контуру", "⌿ Монтажный шов конструкции", "⎓ Снять выпуклость шва", " Плавный переход"]: ttk.Radiobutton(f_r, text=z).pack(side="left", padx=15)
+        for z in ["𝓞 По замкнутому контуру", "⌿  Монтажный шов конструкции", "⎓ Снять выпуклость шва", " Плавный переход"]: ttk.Radiobutton(f_r, text=z).pack(side="left", padx=15)
         f_gosts = ttk.LabelFrame(tab, text=" 1. Стандарты на типы и конструктивные элементы швов соединений "); f_gosts.pack(fill="both", expand=True, padx=20, pady=10)
         self.gost_lb = tk.Listbox(f_gosts, font=("Segoe UI", 10)); self.gost_lb.pack(fill="both", expand=True, padx=10, pady=5)
         for g in ["ГОСТ 16037-80 — Соединения сварные стальных трубопроводов.", "ГОСТ 5264-80 — Ручная дуговая сварка. Соединения сварные сталей.", "ГОСТ 14771-76 — Дуговая сварка в защитном газе."]: self.gost_lb.insert("end", g)
