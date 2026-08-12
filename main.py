@@ -16,7 +16,7 @@ class MetallistProApp:
         self.style.configure('.', font=('Segoe UI', 10))
         self.style.configure('TNotebook.Tab', font=('Segoe UI', 10, 'bold'), padding=5)
         
-        # Верхняя панель управления: Материал и Тема
+        # Panel управления глобальными настройками
         top_ctrl = ttk.LabelFrame(root, text=" Глобальные настройки сессии ")
         top_ctrl.pack(fill="x", padx=15, pady=5)
         
@@ -25,7 +25,6 @@ class MetallistProApp:
         self.global_material.set("Черный металл (Сталь)")
         self.global_material.pack(side="left", padx=5, pady=8)
         
-        # Кнопка переключения тем оформления
         self.theme_btn = ttk.Button(top_ctrl, text="🌓 Сменить тему (Тёмная/Светлая)", command=self.toggle_interface_theme)
         self.theme_btn.pack(side="right", padx=15, pady=8)
         
@@ -38,7 +37,7 @@ class MetallistProApp:
         self.init_detali_tab()
         self.init_metiz_tab()
         self.init_welding_tab()
-        self.init_insulation_tab()  # Новая отдельная вкладка
+        self.init_insulation_tab()
         
         # Фирменный официальный подвал разработчика
         footer = tk.Frame(root, bg="#2c3e50", height=32)
@@ -286,13 +285,11 @@ class MetallistProApp:
         base_w = 1.0
         if "Отвод" in dtype:
             weights_map = {
-                "Ду50": 0.7, "Ду80": 2.1, "Ду100": 3.3, "Ду125": 4.9,
-                "Ду150": 8.1, "Ду200": 17.2, "Ду250": 33.5, "Ду300": 51.4,
-                "Ду400": 98.6, "Ду500": 173.0
+                "Ду50 (∅57)": 0.7, "Ду80 (∅89)": 2.1, "Ду100 (∅108)": 3.3, "Ду125 (∅133)": 4.9,
+                "Ду150 (∅159)": 8.1, "Ду200 (∅219)": 17.2, "Ду250 (∅273)": 33.5, "Ду300 (∅325)": 51.4,
+                "Ду400 (∅426)": 98.6, "Ду500 (∅530)": 173.0
             }
-            # Точный парсинг ключа Ду из строки combobox
-            key = dy.split(" ")[0]
-            base_w = weights_map.get(key, 8.1)
+            base_w = weights_map.get(dy, 8.1)
         else:
             if "Ду150" in dy: base_w = 4.2 if "Переход" in dtype else 6.8
             elif "Ду200" in dy: base_w = 8.5 if "Переход" in dtype else 11.2
@@ -317,7 +314,7 @@ class MetallistProApp:
         
         self.len_frame = ttk.Frame(left); self.len_frame.pack(fill="x", padx=10, pady=2)
         ttk.Label(self.len_frame, text="Длина (L), мм:").pack(anchor="w")
-        self.metiz_l = ttk.Entry(self.len_frame); self.metiz_l.insert(0, "40"); self.len_frame.pack(fill="x", pady=2)
+        self.metiz_l = ttk.Entry(self.len_frame); self.metiz_l.insert(0, "40"); self.metiz_l.pack(fill="x", pady=2)
         
         self.extra_frame = ttk.Frame(left); self.extra_frame.pack(fill="x", padx=10, pady=4)
         ttk.Label(self.extra_frame, text="Класс прочности:").grid(row=0, column=0, sticky="w", pady=2)
@@ -387,41 +384,87 @@ class MetallistProApp:
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="⚡ Сварка")
         
-        inputs = ttk.LabelFrame(tab, text=" Параметры сварочных швов по ГОСТ ")
+        inputs = ttk.LabelFrame(tab, text=" Параметры сварочных швов (ГОСТ 16037-80 / ГОСТ 5264-80) ")
         inputs.pack(fill="x", padx=15, pady=10)
         
-        ttk.Label(inputs, text="Геометрия стыка:").grid(row=0, column=0, padx=5, pady=6, sticky="w")
+        ttk.Label(inputs, text="Геометрия конструкции:").grid(row=0, column=0, padx=5, pady=6, sticky="w")
         self.weld_geom = ttk.Combobox(inputs, values=["Трубный стык ГОСТ 16037", "Плоский шов ГОСТ 5264-80 (1 метр)"], state="readonly", width=26)
         self.weld_geom.set("Трубный стык ГОСТ 16037"); self.weld_geom.grid(row=0, column=1, padx=5, pady=6, sticky="w")
         
         ttk.Label(inputs, text="Толщина стенки стали s, мм:").grid(row=0, column=2, padx=5, pady=6, sticky="w")
         self.weld_pipe_s = ttk.Entry(inputs, width=12); self.weld_pipe_s.insert(0, "6"); self.weld_pipe_s.grid(row=0, column=3, padx=5, pady=6, sticky="w")
         
-        ttk.Label(inputs, text="Тип шва (ГОСТ):").grid(row=1, column=0, padx=5, pady=6, sticky="w")
+        ttk.Label(inputs, text="Тип шва:").grid(row=1, column=0, padx=5, pady=6, sticky="w")
         self.weld_joint_type = ttk.Combobox(inputs, values=["С2 (Стыковое)", "С17 (V-раздел)", "С21 (X-раздел)"], state="readonly", width=20)
         self.weld_joint_type.set("С17 (V-раздел)"); self.weld_joint_type.grid(row=1, column=1, padx=5, pady=6, sticky="w")
         
         ttk.Label(inputs, text="Метод сварки:").grid(row=1, column=2, padx=5, pady=6, sticky="w")
         self.weld_method = ttk.Combobox(inputs, values=["Ручная дуговая (ММА)", "Полуавтомат (MIG/MAG)"], state="readonly", width=18)
         self.weld_method.set("Ручная дуговая (ММА)"); self.weld_method.grid(row=1, column=3, padx=5, pady=6, sticky="w")
+        self.weld_method.bind("<<ComboboxSelected>>", self.on_weld_method_change)
         
-        ttk.Button(inputs, text="⚡ Рассчитать расход сварочных материалов", command=self.calculate_only_welding, width=45).grid(row=2, column=0, columnspan=2, pady=10, padx=5, sticky="ew")
+        # ПОЛНЫЙ ИНЖЕНЕРНЫЙ ФУНКЦИОНАЛ СПРАВОЧНИКОВ СМЕТЫ
+        ttk.Label(inputs, text="Назначение сталей (ГОСТ):").grid(row=2, column=0, padx=5, pady=6, sticky="w")
+        self.weld_steel_type = ttk.Combobox(inputs, values=["Углеродистые (У)", "Легированные (Л)", "Теплоустойчивые (Т)", "Высоколегированные (В)", "Наплавка (Н)", "Чугун / Цветные"], state="readonly", width=20)
+        self.weld_steel_type.set("Углеродистые (У)"); self.weld_steel_type.grid(row=2, column=1, padx=5, pady=6, sticky="w")
+        self.weld_steel_type.bind("<<ComboboxSelected>>", self.update_electrodes_list)
+        
+        self.lbl_el_mat = ttk.Label(inputs, text="Марка электродов:")
+        self.lbl_el_mat.grid(row=2, column=2, padx=5, pady=6, sticky="w")
+        self.weld_electrodes = ttk.Combobox(inputs, state="readonly", width=22)
+        self.weld_electrodes.grid(row=2, column=3, padx=5, pady=6, sticky="w")
+        
+        ttk.Button(inputs, text="⚡ Рассчитать расход сварочных материалов", command=self.calculate_only_welding, width=45).grid(row=3, column=0, columnspan=4, pady=10, padx=5, sticky="ew")
         
         self.weld_only_output = tk.Text(tab, bg="#ffffff", font=("Courier", 10), height=14, bd=1, relief="solid")
         self.weld_only_output.pack(fill="both", expand=True, padx=15, pady=10)
+        self.update_electrodes_list()
 
+    def on_weld_method_change(self, event=None):
+        method = self.weld_method.get()
+        if "Полуавтомат" in method:
+            self.lbl_el_mat.config(text="Защитный газ:")
+            self.weld_electrodes['values'] = ["Углекислота CO2", "Аргон + CO2 (Микс)"]
+            self.weld_electrodes.set("Углекислота CO2")
+        else:
+            self.lbl_el_mat.config(text="Марка электродов:")
+            self.update_electrodes_list()
+
+    def update_electrodes_list(self, event=None):
+        if "Полуавтомат" in self.weld_method.get(): return
+        stype = self.weld_steel_type.get()
+        # ПОЛНАЯ БАЗА ВСЕХ 35+ МАРКИРОВОК ИЗ СПРАВОЧНИКА ТЕПЛОСЕТЕЙ
+        if "(У)" in stype:
+            list_el = ["ОЗС-41", "«Огонек»", "АНО-4", "АНО-4И", "АНО-6", "АНО-6М", "АНО-13", "АНО-13М", "АНО-21", "АНО-21М", "АНО-17", "ВСЦ-4", "ВСЦ-4М", "ОЗС-23", "ОМА-2", "УОНИ-13/45", "УОНИ-13/45А", "УОНИИ-13/45", "УОНИИ-13/45А", "УОНИ-13/45Р"]
+        elif "(Л)" in stype:
+            list_el = ["АНО-ТМ70", "АНП-1", "АНП-2", "УОНИ-13/85", "УОНИ-13/85У", "ЦЛ-18", "ЦЛ-18Мо", "У-340/105", "ЦЛ-19"]
+        elif "(Т)" in stype:
+            list_el = ["ЦЛ-6", "УОНИ-13/15М", "ЦУ-2М", "УОНИ-13ХМ", "ТМЛ-1", "48-Н10", "ЦЛ-55", "ОЗС-11", "ЦЛ-39", "ЦЛ-36", "ЦЛ-40"]
+        elif "(В)" in stype:
+            list_el = ["УОНИ-13НЖ/12Х13", "ЛМЗ-1/12Х13", "ВИ-12-6/10Х17Т", "КТИ-9А/12Х11НМФ", "ОЗЛ-8/04Х19Н9"]
+        elif "(Н)" in stype:
+            list_el = ["ОЗН-300М/11Г3С", "ЦН-14", "ОЗШ-6", "ОЗШ-8"]
+        else:
+            list_el = ["ЦЧ-4", "ОЗА-1", "ОЗА-2", "«Комсомолец-100»", "В-56У"]
+        self.weld_electrodes['values'] = list_el
+        self.weld_electrodes.set(list_el)
     def calculate_only_welding(self):
         try:
             s = float(self.weld_pipe_s.get()); joint = self.weld_joint_type.get(); method = self.weld_method.get(); w_geom = self.weld_geom.get()
+            stype = self.weld_steel_type.get(); gas_el = self.weld_electrodes.get()
             line_length_m = 0.50 if "Трубный" in w_geom else 1.0
             area = (s * 1.5 + 3) if "С2" in joint else ((s**2) * 0.6)
             mass_dep = (area * line_length_m * 7.85) / 1000
             
+            # Автоматический подбор Сварочного Тока и Диаметра по ГОСТ
+            min_i, max_i, diam = (80, 110, "3 мм") if s <= 3 else (130, 170, "4 мм") if s <= 6 else (190, 240, "5 мм")
+            
             if "Полуавтомат" in method:
                 w_mat = mass_dep * 1.12; gas_liters = line_length_m * 220
-                res = f"⚡ ВЕДОМОСТЬ СВАРКИ MIG/MAG:\n----------------------------------------\n• Конструкция: {w_geom} ({joint})\n• Расход сварочной проволоки: {w_mat:.3f} кг\n• Защитный газ CO2: {gas_liters:.1f} л\n"
+                res = f"⚡ ВЕДОМОСТЬ СВАРКИ MIG/MAG ({w_geom}):\n----------------------------------------\n• Тип разделки шва: {joint}\n• Сварочная проволока: {w_mat:.3f} кг\n• Защитный газ ({gas_el}): {gas_liters:.1f} литров\n"
             else:
-                res = f"⚡ ВЕДОМОСТЬ СВАРКИ MMA:\n----------------------------------------\n• Конструкция: {w_geom} ({joint})\n• Расход электродов с огарками: {mass_dep * 1.62:.3f} кг\n"
+                coef = 1.75 if "Высоколегированные" in stype else 1.62
+                res = f"⚡ ВЕДОМОСТЬ СВАРКИ ММА ({w_geom}):\n----------------------------------------\n• Назначение сталей: {stype}\n• Выбранная марка:   {gas_el}\n• Технологический ток: {min_i}-{max_i} А (Электрод ∅{diam})\n• Итоговый расход материалов: {mass_dep * coef:.3f} кг (с огарками)\n"
         except Exception: res = "❌ Ошибка параметров сварки!"
         self.weld_only_output.delete("1.0", tk.END); self.weld_only_output.insert("1.0", res)
 
