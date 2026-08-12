@@ -7,7 +7,7 @@ class MetallistProApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Калькулятор Металлиста PRO — Сметная группа СГК")
-        self.root.geometry("1190x940")
+        self.root.geometry("1200x950")
         
         # Настройка графической темы оформления Arc
         self.style = ThemedStyle(self.root)
@@ -32,7 +32,7 @@ class MetallistProApp:
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
         
-        # Инициализация всех вкладок комплекса
+        # Инициализация всех 8 полноценных вкладок комплекса
         self.init_geometry_tab()
         self.init_sortament_tab()
         self.init_detali_tab()
@@ -142,7 +142,7 @@ class MetallistProApp:
         
         ttk.Label(top, text="Тип проката:").grid(row=0, column=0, padx=5, pady=8, sticky="w")
         self.sort_profile = ttk.Combobox(top, values=["Двутавр ГОСТ 8239-89", "Швеллер ГОСТ 8240-97", "Труба Круглая ГОСТ 10704-91", "Лист ГОСТ 19903-74"], state="readonly", width=25)
-        self.sort_profile.set("Двутавр ГОСТ 8239-89"); self.sort_profile.grid(row=0, column=1, padx=5, pady=8, sticky="w")
+        self.sort_profile.set("Труба Круглая ГОСТ 10704-91"); self.sort_profile.grid(row=0, column=1, padx=5, pady=8, sticky="w")
         self.sort_profile.bind("<<ComboboxSelected>>", self.on_sortament_profile_change)
         
         self.sort_len_frame = ttk.Frame(top)
@@ -165,13 +165,19 @@ class MetallistProApp:
         for r in self.sort_tree.get_children(): self.sort_tree.delete(r)
         prof = self.sort_profile.get()
         if "Двутавр" in prof:
-            data = [("№ 10", "9.46"), ("№ 14", "13.70"), ("№ 20", "21.00"), ("№ 30", "36.50")]
+            data = [("№ 10", "9.46"), ("№ 14", "13.70"), ("№ 20", "21.00"), ("№ 30", "36.50"), ("№ 45", "66.50"), ("№ 60", "108.00")]
         elif "Швеллер" in prof:
-            data = [("5У", "4.84"), ("10У", "8.59"), ("20У", "18.40"), ("40У", "48.30")]
+            data = [("5У", "4.84"), ("10У", "8.59"), ("20У", "18.40"), ("30У", "31.80"), ("40У", "48.30")]
         elif "Лист" in prof:
-            data = [("Лист t=2мм (1500х6000)", "141.3"), ("Лист t=4мм (1500х6000)", "282.6"), ("Лист t=10мм (2000х6000)", "942.0")]
+            data = [("Лист t=2мм (1500х6000)", "141.3"), ("Лист t=4мм (1500х6000)", "282.6"), ("Лист t=10мм (2000х6000)", "942.0"), ("Лист t=20мм (2000х6000)", "1884.0")]
         else:
-            data = [("∅57х3.5", "4.62"), ("∅89х4", "8.38"), ("∅108х4", "10.26"), ("∅159х5", "18.99"), ("∅219х6", "31.52")]
+            # Расширенная магистральная база труб большого диаметра СГК
+            data = [
+                ("∅57х3.5", "4.62"), ("∅89х4", "8.38"), ("∅108х4", "10.26"), ("∅159х5", "18.99"), 
+                ("∅219х6", "31.52"), ("∅273х7", "45.92"), ("∅325х8", "62.54"), ("∅426х9", "92.55"), 
+                ("∅530х10", "128.24"), ("∅630х10", "152.90"), ("∅720х10", "175.10"), ("∅820х10", "199.76"), 
+                ("∅920х10", "224.42"), ("∅1024х10", "250.07"), ("∅1220х12", "357.50"), ("∅1420х14", "499.20")
+            ]
         for item in data: self.sort_tree.insert("", "end", values=item)
 
     def calculate_sortament_weight(self):
@@ -195,7 +201,12 @@ class MetallistProApp:
         self.det_type.set("Отвод 90° ГОСТ 17375-2001"); self.det_type.pack(fill="x", padx=10, pady=4)
         
         ttk.Label(left, text="Типоразмер Ду (DN):").pack(anchor="w", padx=10, pady=2)
-        self.det_dy = ttk.Combobox(left, values=["Ду50 (∅57)", "Ду80 (∅89)", "Ду100 (∅108)", "Ду150 (∅159)", "Ду200 (∅219)", "Ду325", "Ду500"], state="readonly")
+        self.det_dy = ttk.Combobox(left, values=[
+            "Ду50 (∅57)", "Ду80 (∅89)", "Ду100 (∅108)", "Ду150 (∅159)", 
+            "Ду200 (∅219)", "Ду250 (∅273)", "Ду300 (∅325)", "Ду400 (∅426)", 
+            "Ду500 (∅530)", "Ду600 (∅630)", "Ду700 (∅720)", "Ду800 (∅820)", 
+            "Ду900 (∅920)", "Ду1000 (∅1024)"
+        ], state="readonly")
         self.det_dy.set("Ду150 (∅159)"); self.det_dy.pack(fill="x", padx=10, pady=4)
         
         ttk.Label(left, text="Количество деталей, шт:").pack(anchor="w", padx=10, pady=2)
@@ -209,11 +220,20 @@ class MetallistProApp:
         t, d = self.det_type.get(), self.det_dy.get()
         try: c = float(self.det_cnt.get())
         except: c = 1.0
-        w = 8.1 if "Ду150" in d else 3.3 if "Ду100" in d else 17.2 if "Ду200" in d else 1.5
+        
+        # Точные веса отводов СГК большого диаметра
+        w_map = {
+            "Ду50": 0.7, "Ду80": 2.1, "Ду100": 3.3, "Ду150": 8.1,
+            "Ду200": 17.2, "Ду250": 33.5, "Ду300": 51.4, "Ду400": 98.6,
+            "Ду500": 173.0, "Ду600": 248.0, "Ду700": 345.0, "Ду800": 482.0,
+            "Ду900": 634.0, "Ду1000": 810.0
+        }
+        prefix = d.split(" ")[0]
+        w = w_map.get(prefix, 8.1)
+        
         total = w * c * (self.get_density() / 7.85)
         self.det_output.delete("1.0", "end")
-        self.det_output.insert("1.0", f"🔧 ВЕДОМОСТЬ ФАСОННЫХ ЭЛЕМЕНТОВ:\n• {t} [{d}]\n• Объем партии: {int(c)} шт\n▶ ИТОГОВАЯ МАССА: {total:.2f} кг\n")
-
+        self.det_output.insert("1.0", f"🔧 ВЕДОМОСТЬ ФАСОННЫХ ЭЛЕМЕНТОВ:\n• {t} [{d}]\n• Масса 1 ед. (паспортная): {w:.2f} кг\n• Объем партии: {int(c)} шт\n▶ ИТОГОВАЯ МАССА: {total:.2f} кг\n")
     def init_metiz_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="🔩 Метизы")
@@ -225,7 +245,7 @@ class MetallistProApp:
         self.metiz_type.set("Болт ГОСТ 7798"); self.metiz_type.pack(fill="x", padx=10, pady=4)
         
         ttk.Label(left, text="Размер резьбы:").pack(anchor="w", padx=10, pady=2)
-        self.metiz_d = ttk.Combobox(left, values=["М10", "М12", "М16", "М20", "М24"], state="readonly")
+        self.metiz_d = ttk.Combobox(left, values=["М10", "М12", "М16", "М20", "М24", "М30", "М36", "М42", "М48"], state="readonly")
         self.metiz_d.set("М16"); self.metiz_d.pack(fill="x", padx=10, pady=4)
         
         ttk.Label(left, text="Количество, шт:").pack(anchor="w", padx=10, pady=2)
@@ -242,15 +262,18 @@ class MetallistProApp:
         t, d = self.metiz_type.get(), self.metiz_d.get()
         try: c = float(self.metiz_cnt.get())
         except: c = 1.0
-        w_one = 0.12 if "М16" in d else 0.22 if "М20" in d else 0.06
-        if self.kit_check_var.get(): w_one += 0.08
+        
+        w_map = {"М10": 0.03, "М12": 0.05, "М16": 0.12, "М20": 0.22, "М24": 0.38, "М30": 0.65, "М36": 1.05, "М42": 1.60, "М48": 2.40}
+        w_one = w_map.get(d, 0.12)
+        if self.kit_check_var.get(): 
+            w_one += (w_one * 0.65)  # Расчетный доп. вес комплекта крепежа
+            
         self.metiz_info.delete("1.0", "end")
-        self.metiz_info.insert("1.0", f"🔩 СПЕЦИФИКАЦИЯ КРЕПЕЖНЫХ ИЗДЕЛИЙ:\n• {t} {d}\n• Количество: {int(c)} шт\n▶ ИТОГОВЫЙ МАССОВЫЙ ВЕС: {w_one * c:.3f} кг\n")
+        self.metiz_info.insert("1.0", f"🔩 СПЕЦИФИКАЦИЯ КРЕПЕЖНЫХ ИЗДЕЛИЙ:\n• {t} {d}\n• Вес 1 ед. сб.: {w_one:.3f} кг\n• Количество: {int(c)} шт\n▶ ИТОГОВЫЙ МАССОВЫЙ ВЕС: {w_one * c:.3f} кг\n")
     def init_welding_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="⚡ Сварка")
         
-        # 1. Верхняя панель: Исходные данные и Чертеж шва
         top_f = ttk.Frame(tab)
         top_f.pack(fill="x", padx=15, pady=5)
         
@@ -273,25 +296,21 @@ class MetallistProApp:
         self.w_pos_type = ttk.Combobox(in_box, values=["Горизонтальное", "Вертикальное", "Нижнее", "Потолочное"], state="readonly", width=15)
         self.w_pos_type.set("Горизонтальное"); self.w_pos_type.grid(row=2, column=1, padx=5, pady=3, sticky="w")
         
-        # Контейнер для динамических полей ввода параметров разделки по ГОСТ
         self.dyn_grid_frame = ttk.Frame(in_box)
         self.dyn_grid_frame.grid(row=3, column=0, columnspan=2, pady=5, sticky="ew")
         self.w_inputs = {}
         
-        # Эскизный Canvas справа
         self.w_canvas = tk.Canvas(top_f, bg="#ffffff", width=420, height=220, bd=1, relief="solid")
         self.w_canvas.pack(side="right", fill="both", expand=True)
         
         ttk.Button(in_box, text="Считать", command=self.process_gost_welding_calculations).grid(row=4, column=1, padx=5, pady=5, sticky="e")
         
-        # 2. Средняя панель: Электроды и Проволока (Связанная база скриншотов)
         mid_f = ttk.Frame(tab)
         mid_f.pack(fill="x", padx=15, pady=5)
         
         el_box = ttk.LabelFrame(mid_f, text=" Электроды ")
         el_box.pack(fill="x", pady=2)
         
-        # Связанный интерактивный справочник внутри вкладки Сварка
         self.w_el_cat = ttk.Combobox(el_box, values=["Углеродистая и низколегированная сталь", "Легированная конструкционная сталь", "Теплоустойчивая сталь по ГОСТ 9467"], state="readonly", width=38)
         self.w_el_cat.set("Углеродистая и низколегированная сталь"); self.w_el_cat.pack(side="left", padx=10, pady=5)
         self.w_el_cat.bind("<<ComboboxSelected>>", self.sync_welding_tab_electrodes)
@@ -305,7 +324,6 @@ class MetallistProApp:
         self.w_pr_type.set("газовая"); self.w_pr_type.pack(side="left", padx=10, pady=5)
         ttk.Label(pr_box, text="сварка газовая (ГОСТ 16037-80) сварочной присадочной проволокой", font=("Segoe UI", 9, "italic")).pack(side="left", padx=5)
         
-        # 3. Нижняя панель: Результаты вывода (Строго по Скриншоту)
         res_box = ttk.LabelFrame(tab, text=" Результат ")
         res_box.pack(fill="x", padx=15, pady=5)
         
@@ -335,7 +353,7 @@ class MetallistProApp:
         else:
             marks = ["ЦЛ-6", "ЦУ-2М", "ТМЛ-1", "ТМЛ-3У", "ЦЛ-39", "ЦЛ-40"]
         self.w_el_mark['values'] = marks
-        self.w_el_mark.set(marks[0])
+        self.w_el_mark.set(marks)
     def rebuild_weld_grid(self, event=None):
         for w in self.dyn_grid_frame.winfo_children(): w.destroy()
         self.w_inputs.clear()
@@ -369,7 +387,6 @@ class MetallistProApp:
             self.w_canvas.create_rectangle(140, cy-50, 220, cy+50, fill="#dee2e6")
             self.w_canvas.create_rectangle(50, cy, 140, cy+30, fill="#b2bec3")
             self.w_canvas.create_polygon(140, cy, 115, cy-25, 140, cy-25, fill="#ff8c00")
-
     def process_gost_welding_calculations(self):
         joint = self.w_joint_type.get(); rho = self.get_density()
         self.out_e.delete(0, "end"); self.out_el_mass.delete(0, "end"); self.out_pr_mass.delete(0, "end")
@@ -484,7 +501,6 @@ class MetallistProApp:
         f_gosts = ttk.LabelFrame(tab, text=" 1. Стандарты на типы и конструктивные элементы швов соединений "); f_gosts.pack(fill="both", expand=True, padx=20, pady=10)
         self.gost_lb = tk.Listbox(f_gosts, font=("Segoe UI", 10)); self.gost_lb.pack(fill="both", expand=True, padx=10, pady=5)
         for g in ["ГОСТ 16037-80 — Соединения сварные стальных трубопроводов.", "ГОСТ 5264-80 — Ручная дуговая сварка. Соединения сварные сталей.", "ГОСТ 14771-76 — Дуговая сварка в защитном газе."]: self.gost_lb.insert("end", g)
-
     def init_insulation_tab(self):
         tab = ttk.Frame(self.notebook); self.notebook.add(tab, text="环 Изоляция")
         inputs = ttk.LabelFrame(tab, text=" Геометрический расчет объемов теплоизоляции по схеме "); inputs.pack(fill="x", padx=15, pady=10)
@@ -503,8 +519,10 @@ class MetallistProApp:
         for w in self.iso_inputs_frame.winfo_children(): w.destroy()
         self.iso_entries.clear()
         itype = self.iso_calc_type.get()
-        if itype == "Одна труба": fields = [("Диаметр трубы D, м", "0.125"), ("Толщина изоляции t, м", "0.08"), ("Длина участка L, м", "130")]
-        else: fields = [("Диаметр крайних D1, м", "0.108"), ("Диаметр средних D2, м", "0.076"), ("Толщина изоляции t, м", "0.1"), ("Зазор труб p, м", "0.1"), ("Длина участка L, м", "65")]
+        if itype == "Одна труба": 
+            fields = [("Диаметр трубы D, м", "1.024"), ("Толщина изоляции t, м", "0.1"), ("Длина участка L, м", "100")]
+        else: 
+            fields = [("Диаметр крайних D1, м", "1.024"), ("Диаметр средних D2, м", "0.720"), ("Толщина изоляции t, м", "0.1"), ("Зазор труб p, м", "0.15"), ("Длина участка L, м", "50")]
         for idx, (lbl, val) in enumerate(fields):
             ttk.Label(self.iso_inputs_frame, text=lbl).grid(row=0, column=idx*2, padx=4, pady=4, sticky="w")
             e = ttk.Entry(self.iso_inputs_frame, width=10); e.insert(0, val); e.grid(row=0, column=idx*2+1, padx=4, pady=4)
