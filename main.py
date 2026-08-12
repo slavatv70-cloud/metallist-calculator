@@ -283,25 +283,55 @@ class MetallistProApp:
 
     def proc_metiz_calc(self):
         t, d = self.metiz_type.get(), self.metiz_d.get()
+        rho_coeff = self.get_density() / 7.85  # Поправка на массу в зависимости от выбранного сплава в сессии
         try: c = float(self.metiz_cnt.get())
         except: c = 1.0
         
-        w_base = {"М10": 0.03, "М12": 0.05, "М16": 0.12, "М20": 0.22, "М24": 0.38, "М30": 0.65, "М36": 1.05, "М42": 1.60, "М48": 2.40}
-        w_one = w_base.get(d, 0.12)
+        # 1. Базовые справочные массы элементов крепежа по ГОСТ (для 1 шт. в кг)
+        weights_bolt_90 = {"М10": 0.068, "М12": 0.102, "М16": 0.198, "М20": 0.342, "М24": 0.564, "М30": 0.985, "М36": 1.540, "М42": 2.280, "М48": 3.120}
+        weights_stud_90 = {"М10": 0.055, "М12": 0.080, "М16": 0.142, "М20": 0.246, "М24": 0.395, "М30": 0.670, "М36": 1.020, "М42": 1.480, "М48": 2.050}
+        weights_nut = {"М10": 0.011, "М12": 0.015, "М16": 0.033, "М20": 0.064, "М24": 0.110, "М30": 0.230, "М36": 0.390, "М42": 0.620, "М48": 0.960}
+        weights_washer = {"М10": 0.004, "М12": 0.006, "М16": 0.011, "М20": 0.017, "М24": 0.032, "М30": 0.054, "М36": 0.092, "М42": 0.182, "М48": 0.274}
         
-        info_str = f"🔩 СПЕЦИФИКАЦИЯ КРЕПЕЖНЫХ ИЗДЕЛИЙ:\n• Наименование: {t} {d}"
+        w_one = 0.0
+        info_str = f"🔩 СПЕЦИФИКАЦИЯ КРЕПЕЖНЫХ ИЗДЕЛИЙ СГК:\n• Наименование: {t} {d}"
         
-        if "Болт" in t or "Шпилька" in t:
+        # 2. Логика раздельного обсчета веса стержневых элементов и штучной фасонины
+        if "Болт" in t:
             try: L = float(self.metiz_l.get())
             except: L = 90.0
-            w_one = w_one * (L / 90.0)
+            # Вес болта = вес головки + вес стержня пропорционально выбранной длине
+            w_head = weights_bolt_90[d] - weights_stud_90[d]
+            w_one = (w_head + weights_stud_90[d] * (L / 90.0)) * rho_coeff
             info_str += f" х {int(L)} мм"
+            
             if self.kit_check_var.get():
-                w_one += (w_base.get(d, 0.12) * 0.55)
-                info_str += "\n• Комплектация: +1 гайка + 2 шайбы"
+                w_kit = weights_nut[d] + (weights_washer[d] * 2)
+                w_one += w_kit * rho_coeff
+                info_str += f"\n• Комплектация пар: +1 гайка + 2 шайбы (+{w_kit*rho_coeff:.3f} кг)"
                 
+        elif "Шпилька" in t:
+            try: L = float(self.metiz_l.get())
+            except: L = 90.0
+            # Расчет веса шпильки без головки прямо по длине
+            w_one = (weights_stud_90[d] * (L / 90.0)) * rho_coeff
+            info_str += f" х {int(L)} мм"
+            
+            if self.kit_check_var.get():
+                w_kit = weights_nut[d] + (weights_washer[d] * 2)
+                w_one += w_kit * rho_coeff
+                info_str += f"\n• Комплектация пар: +1 гайка + 2 шайбы (+{w_kit*rho_coeff:.3f} кг)"
+                
+        elif "Гайка" in t:
+            w_one = weights_nut.get(d, 0.033) * rho_coeff
+        elif "Шайба" in t:
+            w_one = weights_washer.get(d, 0.011) * rho_coeff
+            
+        total_weight = w_one * c
+        
         self.metiz_info.delete("1.0", "end")
-        self.metiz_info.insert("1.0", f"{info_str}\n• Масса изделия: {w_one:.3f} кг\n• Общий объем: {int(c)} шт\n----------------------------------------\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС: {w_one * c:.3f} кг\n")
+        self.metiz_info.insert("1.0", f"{info_str}\n• Материал деталей: {self.global_material.get()}\n• Масса 1 единицы сб.: {w_one:.4f} кг\n• Общий объем партии: {int(c)} шт\n----------------------------------------\n▶ ИТОГОВЫЙ ВЕС ПО СПЕЦИФИКАЦИИ: {total_weight:.3f} кг\n")
+e:.3f} кг\n• Общий объем: {int(c)} шт\n----------------------------------------\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС: {w_one * c:.3f} кг\n")
     def init_welding_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="⚡ Сварка")
