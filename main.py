@@ -932,7 +932,7 @@ class MetallistProApp:
         self.weld_section.bind("<<ComboboxSelected>>", self.on_weld_section_change)
         
         ttk.Label(row1, text="Тип соединения:").pack(side="left", padx=5)
-        self.weld_joint_type = ttk.Combobox(row1, values=[], state="readonly", width=15)
+        self.weld_joint_type = ttk.Combobox(row1, values=[], state="readonly", width=20)
         self.weld_joint_type.pack(side="left", padx=5)
         self.weld_joint_type.bind("<<ComboboxSelected>>", self.on_weld_joint_change)
         
@@ -1126,6 +1126,19 @@ class MetallistProApp:
         """Обработка смены типа соединения"""
         self.build_weld_params()
 
+    def get_param_value(self, param_name, default=0):
+        """Безопасное получение значения параметра"""
+        if param_name in self.weld_params:
+            widget = self.weld_params[param_name]
+            value = widget.get().strip()
+            if value == "":
+                return default
+            try:
+                return float(value)
+            except ValueError:
+                return default
+        return default
+
     def build_weld_params(self):
         """Построение полей параметров для текущего соединения"""
         for w in self.params_frame.winfo_children():
@@ -1139,7 +1152,7 @@ class MetallistProApp:
         params = []
         
         if "Раздел I" in section:
-            if "C" in joint or "С" in joint:
+            if any(x in joint for x in ["C", "С"]):
                 params = [
                     ("Толщина деталей S, мм", "4"),
                     ("Длина шва L, м", "1.0"),
@@ -1149,13 +1162,13 @@ class MetallistProApp:
                     params.append(("Угол скоса α°, град", "50"))
             elif "У" in joint:
                 params = [
-                    ("Катет шва K, мм", "4"),
+                    ("Катет шва K, мм", "6"),
                     ("Длина шва L, м", "1.0"),
                     ("Количество швов n", "1")
                 ]
             elif "Т" in joint:
                 params = [
-                    ("Катет шва K, мм", "4"),
+                    ("Катет шва K, мм", "6"),
                     ("Длина шва L, м", "1.0"),
                     ("Количество швов n", "1")
                 ]
@@ -1166,24 +1179,25 @@ class MetallistProApp:
                     ("Количество швов n", "1")
                 ]
         elif "Раздел II" in section:
-            if "С2" in joint or "С8" in joint:
+            # Для трубопроводов - добавляем диаметр трубы вместо длины шва
+            if "С2" in joint or "С8" in joint or "С17" in joint:
                 params = [
                     ("Толщина стенки S, мм", "4"),
                     ("Диаметр трубы D, мм", "57"),
-                    ("Количество стыков", "1")
+                    ("Количество стыков n", "1")
                 ]
             else:
                 params = [
                     ("Толщина стенки S, мм", "4"),
                     ("Диаметр трубы D, мм", "57"),
-                    ("Количество стыков", "1")
+                    ("Количество стыков n", "1")
                 ]
-            if "фланец" in joint.lower():
+            if "фланец" in joint.lower() or "У" in joint:
                 params.append(("Толщина фланца S1, мм", "4"))
         elif "Раздел III" in section:
             params = [
                 ("Диаметр стержня d, мм", "20"),
-                ("Количество соединений", "1")
+                ("Количество соединений n", "1")
             ]
             if "крестообразное" in joint.lower():
                 params.append(("Расстояние между стержнями", "100"))
@@ -1221,7 +1235,6 @@ class MetallistProApp:
             k_pos = pos_coeff.get(pos, 1.0)
             
             # Справочные данные по нормам расхода электродов (Сборник 30, Таблицы 002-016)
-            # Нормы на 1 м шва для ручной дуговой сварки (группы электродов I-IV)
             norms = {
                 "C2": {  # Таблица 002
                     1: {"I": 0.052, "II": 0.056, "III": 0.059, "IV": 0.063},
@@ -1255,30 +1268,38 @@ class MetallistProApp:
             }
             
             # Определение параметров
-            if "C2" in joint or "С2" in joint:
-                S = float(self.weld_params.get("Толщина деталей S, мм", ttk.Entry()).get())
-                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
-                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
+            if any(x in joint for x in ["C2", "С2"]):
+                S = self.get_param_value("Толщина деталей S, мм", 4)
+                L = self.get_param_value("Длина шва L, м", 1.0)
+                n = self.get_param_value("Количество швов n", 1)
+                
+                if S == 0:
+                    S = 4
+                if L == 0:
+                    L = 1.0
+                if n == 0:
+                    n = 1
                 
                 # Поиск нормы для заданной толщины
                 norm_data = norms.get("C2", {})
                 s_key = min(norm_data.keys(), key=lambda x: abs(x - S))
                 if s_key in norm_data:
-                    norm = norm_data[s_key].get(["I","II","III","IV"][group-1], 0.1)
+                    group_key = ["I","II","III","IV"][group-1] if group <= 4 else "III"
+                    norm = norm_data[s_key].get(group_key, 0.1)
                 else:
                     norm = 0.1
                 
                 # Расчет
-                norm *= k_pos * k_el / 1.6  # Корректировка на группу электрода
+                norm *= k_pos * k_el / 1.6
                 total = norm * L * n
                 
                 self.display_results(joint, {
                     "Норма расхода на 1 м шва": f"{norm:.4f}",
-                    "Длина шва": f"{L}",
+                    "Длина шва": f"{L:.1f}",
                     "Количество швов": f"{int(n)}",
                     "Общий расход электродов": f"{total:.4f}",
-                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
-                    "Коэффициент положения": f"{k_pos}"
+                    "Группа электродов": f"{['I','II','III','IV'][group-1] if group <= 4 else 'III'} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos:.2f}"
                 }, "кг")
                 
                 self.result_text.delete("1.0", tk.END)
@@ -1286,34 +1307,40 @@ class MetallistProApp:
                     f"Расчет по Сборнику 30 (Таблица 002)\n"
                     f"Соединение: {joint}\n"
                     f"Толщина: {S} мм, Длина шва: {L} м\n"
-                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1]}\n"
+                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1] if group <= 4 else 'III'}\n"
                     f"ИТОГО: {total:.4f} кг электродов\n"
                 )
                 
-            elif "C17" in joint or "С17" in joint:
-                S = float(self.weld_params.get("Толщина деталей S, мм", ttk.Entry()).get())
-                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
-                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
+            elif any(x in joint for x in ["C17", "С17"]):
+                S = self.get_param_value("Толщина деталей S, мм", 6)
+                L = self.get_param_value("Длина шва L, м", 1.0)
+                n = self.get_param_value("Количество швов n", 1)
+                
+                if S == 0:
+                    S = 6
+                if L == 0:
+                    L = 1.0
+                if n == 0:
+                    n = 1
                 
                 norm_data = norms.get("C17", {})
                 s_key = min(norm_data.keys(), key=lambda x: abs(x - S))
                 if s_key in norm_data:
-                    norm = norm_data[s_key].get(["I","II","III","IV"][group-1], 0.2)
+                    group_key = ["I","II","III","IV"][group-1] if group <= 4 else "III"
+                    norm = norm_data[s_key].get(group_key, 0.2)
                 else:
-                    # Экстраполяция
-                    base_norm = 0.2 * (S / 6) ** 0.8
-                    norm = base_norm
+                    norm = 0.2 * (S / 6) ** 0.8
                 
                 norm *= k_pos * k_el / 1.6
                 total = norm * L * n
                 
                 self.display_results(joint, {
                     "Норма расхода на 1 м шва": f"{norm:.4f}",
-                    "Длина шва": f"{L}",
+                    "Длина шва": f"{L:.1f}",
                     "Количество швов": f"{int(n)}",
                     "Общий расход электродов": f"{total:.4f}",
-                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
-                    "Коэффициент положения": f"{k_pos}"
+                    "Группа электродов": f"{['I','II','III','IV'][group-1] if group <= 4 else 'III'} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos:.2f}"
                 }, "кг")
                 
                 self.result_text.delete("1.0", tk.END)
@@ -1321,19 +1348,27 @@ class MetallistProApp:
                     f"Расчет по Сборнику 30 (Таблица 006)\n"
                     f"Соединение: {joint}\n"
                     f"Толщина: {S} мм, Длина шва: {L} м\n"
-                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1]}\n"
+                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1] if group <= 4 else 'III'}\n"
                     f"ИТОГО: {total:.4f} кг электродов\n"
                 )
                 
             elif "У4" in joint:
-                K = float(self.weld_params.get("Катет шва K, мм", ttk.Entry()).get())
-                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
-                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
+                K = self.get_param_value("Катет шва K, мм", 6)
+                L = self.get_param_value("Длина шва L, м", 1.0)
+                n = self.get_param_value("Количество швов n", 1)
+                
+                if K == 0:
+                    K = 6
+                if L == 0:
+                    L = 1.0
+                if n == 0:
+                    n = 1
                 
                 norm_data = norms.get("У4", {})
                 k_key = min(norm_data.keys(), key=lambda x: abs(x - K))
                 if k_key in norm_data:
-                    norm = norm_data[k_key].get(["I","II","III","IV"][group-1], 0.3)
+                    group_key = ["I","II","III","IV"][group-1] if group <= 4 else "III"
+                    norm = norm_data[k_key].get(group_key, 0.3)
                 else:
                     norm = 0.3 * (K / 6) ** 1.2
                 
@@ -1342,22 +1377,30 @@ class MetallistProApp:
                 
                 self.display_results(joint, {
                     "Норма расхода на 1 м шва": f"{norm:.4f}",
-                    "Длина шва": f"{L}",
+                    "Длина шва": f"{L:.1f}",
                     "Количество швов": f"{int(n)}",
                     "Общий расход электродов": f"{total:.4f}",
-                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
-                    "Коэффициент положения": f"{k_pos}"
+                    "Группа электродов": f"{['I','II','III','IV'][group-1] if group <= 4 else 'III'} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos:.2f}"
                 }, "кг")
                 
             elif "Т1" in joint:
-                K = float(self.weld_params.get("Катет шва K, мм", ttk.Entry()).get())
-                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
-                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
+                K = self.get_param_value("Катет шва K, мм", 6)
+                L = self.get_param_value("Длина шва L, м", 1.0)
+                n = self.get_param_value("Количество швов n", 1)
+                
+                if K == 0:
+                    K = 6
+                if L == 0:
+                    L = 1.0
+                if n == 0:
+                    n = 1
                 
                 norm_data = norms.get("Т1", {})
                 k_key = min(norm_data.keys(), key=lambda x: abs(x - K))
                 if k_key in norm_data:
-                    norm = norm_data[k_key].get(["I","II","III","IV"][group-1], 0.2)
+                    group_key = ["I","II","III","IV"][group-1] if group <= 4 else "III"
+                    norm = norm_data[k_key].get(group_key, 0.2)
                 else:
                     norm = 0.2 * (K / 6) ** 1.3
                 
@@ -1366,49 +1409,71 @@ class MetallistProApp:
                 
                 self.display_results(joint, {
                     "Норма расхода на 1 м шва": f"{norm:.4f}",
-                    "Длина шва": f"{L}",
+                    "Длина шва": f"{L:.1f}",
                     "Количество швов": f"{int(n)}",
                     "Общий расход электродов": f"{total:.4f}",
-                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
-                    "Коэффициент положения": f"{k_pos}"
+                    "Группа электродов": f"{['I','II','III','IV'][group-1] if group <= 4 else 'III'} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos:.2f}"
                 }, "кг")
                 
             elif "Раздел II" in section:
-                # Сварка трубопроводов
-                S = float(self.weld_params.get("Толщина стенки S, мм", ttk.Entry()).get())
-                D = float(self.weld_params.get("Диаметр трубы D, мм", ttk.Entry()).get())
-                n = float(self.weld_params.get("Количество стыков", ttk.Entry()).get() or 1)
+                # Сварка трубопроводов - используем диаметр трубы
+                S = self.get_param_value("Толщина стенки S, мм", 4)
+                D = self.get_param_value("Диаметр трубы D, мм", 57)
+                n = self.get_param_value("Количество стыков n", 1)
                 
-                # Расчет длины шва для трубы
+                if S == 0:
+                    S = 4
+                if D == 0:
+                    D = 57
+                if n == 0:
+                    n = 1
+                
+                # Расчет длины шва для трубы (периметр трубы)
                 L_shv = math.pi * (D - S) / 1000  # в метрах
                 
-                # Базовая норма для труб (ориентировочно по Сборнику 30)
-                base_norm = 0.15 * (S / 4) ** 0.7
+                # Определение типа соединения для выбора нормы
+                if "С2" in joint or "С8" in joint:
+                    # Базовая норма для С2/С8 (Таблица 002/004)
+                    base_norm = 0.15 * (S / 4) ** 0.7
+                elif "С17" in joint:
+                    # Норма для С17 (Таблица 006)
+                    base_norm = 0.20 * (S / 4) ** 0.8
+                else:
+                    # Общая норма для труб
+                    base_norm = 0.18 * (S / 4) ** 0.75
+                
                 norm = base_norm * k_pos * k_el / 1.6
                 total = norm * L_shv * n
                 
                 self.display_results(joint, {
                     "Норма на 1 м шва": f"{norm:.4f}",
+                    "Диаметр трубы D": f"{D:.0f}",
                     "Длина шва на стык": f"{L_shv:.3f}",
                     "Количество стыков": f"{int(n)}",
                     "Общий расход": f"{total:.4f}",
-                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
-                    "Коэффициент положения": f"{k_pos}"
+                    "Группа электродов": f"{['I','II','III','IV'][group-1] if group <= 4 else 'III'} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos:.2f}"
                 }, "кг")
                 
                 self.result_text.delete("1.0", tk.END)
                 self.result_text.insert("1.0", 
                     f"Расчет по Сборнику 30 (Раздел II)\n"
                     f"Соединение: {joint}\n"
-                    f"Труба ∅{D}х{S} мм, Длина шва: {L_shv:.3f} м\n"
-                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1]}\n"
+                    f"Труба ∅{D:.0f}х{S} мм, Длина шва: {L_shv:.3f} м\n"
+                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1] if group <= 4 else 'III'}\n"
                     f"ИТОГО: {total:.4f} кг электродов\n"
                 )
                 
             elif "Раздел III" in section:
                 # Сварка арматуры
-                d = float(self.weld_params.get("Диаметр стержня d, мм", ttk.Entry()).get())
-                n = float(self.weld_params.get("Количество соединений", ttk.Entry()).get() or 1)
+                d = self.get_param_value("Диаметр стержня d, мм", 20)
+                n = self.get_param_value("Количество соединений n", 1)
+                
+                if d == 0:
+                    d = 20
+                if n == 0:
+                    n = 1
                 
                 # Ориентировочные нормы для арматуры
                 if d <= 10:
@@ -1431,7 +1496,7 @@ class MetallistProApp:
                     "Норма на 1 соединение": f"{norm_one:.4f}",
                     "Количество соединений": f"{int(n)}",
                     "Общий расход": f"{total:.4f}",
-                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})"
+                    "Группа электродов": f"{['I','II','III','IV'][group-1] if group <= 4 else 'III'} (K={k_el})"
                 }, "кг")
                 
                 self.result_text.delete("1.0", tk.END)
@@ -1444,8 +1509,13 @@ class MetallistProApp:
                 
             elif "Раздел IV" in section:
                 # Газовая резка
-                S = float(self.weld_params.get("Толщина металла S, мм", ttk.Entry()).get())
-                L = float(self.weld_params.get("Длина реза L, м", ttk.Entry()).get() or 1.0)
+                S = self.get_param_value("Толщина металла S, мм", 10)
+                L = self.get_param_value("Длина реза L, м", 1.0)
+                
+                if S == 0:
+                    S = 10
+                if L == 0:
+                    L = 1.0
                 
                 # Ориентировочные нормы расхода газов (Сборник 30, Таблица 094)
                 if S <= 5:
@@ -1464,8 +1534,8 @@ class MetallistProApp:
                 self.display_results(joint, {
                     "Расход кислорода": f"{oxygen:.2f}",
                     "Расход ацетилена": f"{acetylene:.2f}",
-                    "Длина реза": f"{L}",
-                    "Толщина металла": f"{S}"
+                    "Длина реза": f"{L:.1f}",
+                    "Толщина металла": f"{S:.1f}"
                 }, "л")
                 
                 self.result_text.delete("1.0", tk.END)
@@ -1476,12 +1546,12 @@ class MetallistProApp:
                     f"Кислород: {oxygen:.2f} л, Ацетилен: {acetylene:.2f} л\n"
                 )
             else:
-                messagebox.showinfo("Информация", "Для данного типа соединения расчет выполняется по общим формулам")
+                messagebox.showinfo("Информация", "Для данного типа соединения выполняется расчет по общей методике")
                 self.result_text.delete("1.0", tk.END)
                 self.result_text.insert("1.0", "Для данного соединения используйте ручной расчет по Сборнику 30")
                 
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Ошибка при расчете: {str(e)}")
+            messagebox.showerror("Ошибка", f"Ошибка при расчете: {str(e)}\nПроверьте заполнение всех параметров.")
             self.result_text.delete("1.0", tk.END)
             self.result_text.insert("1.0", f"Ошибка: {str(e)}")
 
