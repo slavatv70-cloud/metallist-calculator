@@ -22,10 +22,10 @@ class MetallistProApp:
         
         ttk.Label(top_ctrl, text="Материал для расчетов:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=10, pady=8)
         self.global_material = ttk.Combobox(top_ctrl, values=[
-            "Черный metal (Сталь)", "Нержавеющая сталь", "Алюминий", 
+            "Черный металл (Сталь)", "Нержавеющая сталь", "Алюминий", 
             "Бронза", "Латунь", "Медь", "Никель", "Чугун"
         ], state="readonly", width=22)
-        self.global_material.set("Черный metal (Сталь)")
+        self.global_material.set("Черный металл (Сталь)")
         self.global_material.pack(side="left", padx=5, pady=8)
         
         self.theme_btn = ttk.Button(top_ctrl, text="🌓 Сменить тему (Тёмная/Светлая)", command=self.toggle_interface_theme)
@@ -35,7 +35,7 @@ class MetallistProApp:
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
         
-        # Последовательный вызов всех 8 вкладок комплекса
+        # Последовательный вызов всех 8 вкладок комплекса (Имена строго выверены)
         self.init_geometry_tab()
         self.init_sortament_tab()
         self.init_detali_tab()
@@ -142,6 +142,89 @@ class MetallistProApp:
                 res += f"Площадь сечения: {(math.sqrt(3)/2)*(S**2):.2f} мм²\nВес заготовки: {((math.sqrt(3)/2)*(S**2)*L*rho)/1000000:.3f} кг\n"
         except Exception as e: res += f"Ошибка: {str(e)}"
         self.geom_result.config(state="normal"); self.geom_result.delete("1.0", tk.END); self.geom_result.insert("1.0", res); self.geom_result.config(state="disabled")
+    def init_sortament_tab(self):
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text="📊 Сортамент")
+        
+        top = ttk.LabelFrame(tab, text=" Параметры проката и труб ")
+        top.pack(fill="x", padx=15, pady=10)
+        
+        # Конфигурация гибкой сетки параметров верхнего блока
+        top.grid_columnconfigure(1, weight=1)
+        top.grid_columnconfigure(3, weight=1)
+        
+        ttk.Label(top, text="Тип проката:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.sort_profile = ttk.Combobox(top, values=["Двутавр ГОСТ 8239-89", "Швеллер ГОСТ 8240-97", "Труба Круглая ГОСТ 10704-91", "Лист ГОСТ 19903-74"], state="readonly", width=25)
+        self.sort_profile.set("Труба Круглая ГОСТ 10704-91")
+        self.sort_profile.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.sort_profile.bind("<<ComboboxSelected>>", self.on_sortament_profile_change)
+        
+        self.lbl_main_len = ttk.Label(top, text="Длина участка, м:")
+        self.lbl_main_len.grid(row=0, column=2, padx=10, pady=5, sticky="w")
+        self.sort_length = ttk.Entry(top, width=10)
+        self.sort_length.insert(0, "12")
+        self.sort_length.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        
+        # Динамический контейнер ручного ввода параметров САПР
+        self.sort_manual_frame = ttk.LabelFrame(top, text=" Ручной ввод параметров геометрии (СГК-САПР) ")
+        self.sort_manual_frame.grid(row=1, column=0, columnspan=4, padx=5, pady=8, sticky="ew")
+        
+        # Объекты динамических полей ввода
+        self.sort_dyn_widgets = {}
+        
+        ttk.Button(top, text="Рассчитать прокат / трубу", command=self.calculate_sortament_weight).grid(row=2, column=0, columnspan=4, padx=15, pady=8, sticky="ew")
+        
+        self.sort_tree = ttk.Treeview(tab, columns=("num", "weight"), show="headings", height=5)
+        self.sort_tree.heading("num", text="Типоразмер / Профиль по справочнику ГОСТ")
+        self.sort_tree.heading("weight", text="Вес 1 погонного метра (или листа), кг")
+        self.sort_tree.column("num", width=350, anchor="center")
+        self.sort_tree.column("weight", width=250, anchor="center")
+        self.sort_tree.pack(fill="x", padx=15, pady=5)
+        
+        self.sort_output = tk.Text(tab, bg="#ffffff", font=("Consolas", 10), height=8, bd=1, relief="solid")
+        self.sort_output.pack(fill="both", expand=True, padx=15, pady=10)
+        self.on_sortament_profile_change()
+
+    def rebuild_sortament_manual_inputs(self):
+        # Полная очистка динамического фрейма ввода во избежание накладок
+        for w in self.sort_manual_frame.winfo_children(): w.destroy()
+        self.sort_dyn_widgets.clear()
+        
+        prof = self.sort_profile.get()
+        
+        if "Лист" in prof:
+            # Активация раскроя Листа: Убираем длину участка, разворачиваем Ширину, Длину и Толщину листа вручную
+            self.lbl_main_len.grid_remove()
+            self.sort_length.grid_remove()
+            
+            ttk.Label(self.sort_manual_frame, text="Ширина листа, мм:").grid(row=0, column=0, padx=5, pady=6, sticky="w")
+            e_w = tk.Entry(self.sort_manual_frame, width=10, bg="#fff2cc", justify="center"); e_w.insert(0, "1500")
+            e_w.grid(row=0, column=1, padx=5, pady=6, sticky="w")
+            self.sort_dyn_widgets["Ширина"] = e_w
+            
+            ttk.Label(self.sort_manual_frame, text="Длина листа, мм:").grid(row=0, column=2, padx=12, pady=6, sticky="w")
+            e_l = tk.Entry(self.sort_manual_frame, width=10, bg="#fff2cc", justify="center"); e_l.insert(0, "6000")
+            e_l.grid(row=0, column=3, padx=5, pady=6, sticky="w")
+            self.sort_dyn_widgets["Длина"] = e_l
+            
+            ttk.Label(self.sort_manual_frame, text="Толщина листа, мм:").grid(row=0, column=4, padx=12, pady=6, sticky="w")
+            e_t = tk.Entry(self.sort_manual_frame, width=8, bg="#fff2cc", justify="center"); e_t.insert(0, "4")
+            e_t.grid(row=0, column=5, padx=5, pady=6, sticky="w")
+            self.sort_dyn_widgets["Толщина"] = e_t
+        else:
+            # Для Труб, Двутавров и Швеллеров: Возвращаем стандартное окно Длины участка, выводим Диаметр и Стенку
+            self.lbl_main_len.grid()
+            self.sort_length.grid()
+            
+            ttk.Label(self.sort_manual_frame, text="Внешний диаметр (D), мм:").grid(row=0, column=0, padx=8, pady=6, sticky="w")
+            e_d = tk.Entry(self.sort_manual_frame, width=12, bg="#fff2cc", justify="center")
+            e_d.grid(row=0, column=1, padx=5, pady=6, sticky="w")
+            self.sort_dyn_widgets["Диаметр"] = e_d
+            
+            ttk.Label(self.sort_manual_frame, text="Толщина стенки (s), мм:").grid(row=0, column=2, padx=15, pady=6, sticky="w")
+            e_s = tk.Entry(self.sort_manual_frame, width=12, bg="#fff2cc", justify="center")
+            e_s.grid(row=0, column=3, padx=5, pady=6, sticky="w")
+            self.sort_dyn_widgets["Стенка"] = e_s
     def on_sortament_profile_change(self, event=None):
         for r in self.sort_tree.get_children(): self.sort_tree.delete(r)
         prof = self.sort_profile.get()
@@ -166,16 +249,16 @@ class MetallistProApp:
         prof = self.sort_profile.get()
         res = ""
         
-        # Разветвитель 1: Расчет для ЛИСТА по свободным размерам СГК
+        # Разветвитель 1: Геометрический расчет ЛИСТА по свободным размерам СГК
         if "Лист" in prof:
             try:
                 w_mm = float(self.sort_dyn_widgets["Ширина"].get().strip())
                 l_mm = float(self.sort_dyn_widgets["Длина"].get().strip())
                 t_mm = float(self.sort_dyn_widgets["Толщина"].get().strip())
                 
-                # Масса одного стального листа: Объем в куб.мм / 1 000 000 * плотность
+                # Масса листа: Объем в куб.мм / 1 000 000 * плотность сплава в г/см3
                 total = (w_mm * l_mm * t_mm) / 1000000.0 * rho
-                res = f"📊 РЕЗУЛЬТАТ РАСЧЕТА ЛИСТОВОГО ПРОКАТА:\n• Спецификация: {prof}\n• Параметры раскроя: {w_mm} мм х {l_mm} мм, толщина {t_mm} мм\n• Удельный вес сплава: {rho:.2f} г/см³\n------------------------------------------------------------\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС ЛИСТА: {total:.3f} кг\n"
+                res = f"📊 РЕЗУЛЬТАТ РАСЧЕТА ЛИСТОВОГО ПРОКАТА:\n• Спецификация: {prof}\n• Размеры раскроя: {w_mm} мм х {l_mm} мм, толщина {t_mm} мм\n• Удельная плотность сплава: {rho:.2f} г/см³\n------------------------------------------------------------\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС ЛИСТА: {total:.3f} кг\n"
             except Exception as e:
                 messagebox.showerror("Ошибка", "Заполните все желтые поля Листа (Ширина, Длина, Толщина) числами!")
                 return
@@ -191,15 +274,16 @@ class MetallistProApp:
                 try:
                     D = float(man_d)
                     s = float(man_s)
+                    # Формула массы 1м трубы: пи * (D - s) * s * ро / 1000
                     w_meter = math.pi * (D - s) * s * (rho / 1000.0)
-                    desc_str = f"Ручной ввод (Труба ∅{D}х{s})"
+                    desc_str = f"Свободный ручной ввод (Труба ∅{D}х{s})"
                 except Exception as e:
                     messagebox.showerror("Ошибка", f"Некорректные числовые параметры ручной трубы: {e}")
                     return
             else:
                 sel = self.sort_tree.focus()
                 if not sel: 
-                    messagebox.showwarning("Внимание", "Выберите строку в таблице справочника или заполните желтые поля ручной геометрии!")
+                    messagebox.showwarning("Внимание", "Выберите строку в таблице справочника или заполните желтые поля ручной геометрии трубы!")
                     return
                 item_data = self.sort_tree.item(sel)
                 val = item_data["values"]
@@ -208,7 +292,7 @@ class MetallistProApp:
                 except: w_meter = 0.0
                 
             total = w_meter * L
-            res = f"📊 РЕЗУЛЬТАТ РАСЧЕТА СОРТАМЕНТА:\n• Профиль / Марка: {prof} -> {desc_str}\n• Вес 1 погонного метра: {w_meter:.3f} кг\n• Длина участка: {L} м\n------------------------------------------------------------\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС ПАРТИИ: {total:.3f} кг\n"
+            res = f"📊 РЕЗУЛЬТАТ РАСЧЕТА СОРТАМЕНТА:\n• Профиль / Марка: {prof} -> {desc_str}\n• Теоретический вес 1 пог. м: {w_meter:.3f} кг\n• Общая длина участка: {L} м\n------------------------------------------------------------\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС ПАРТИИ: {total:.3f} кг\n"
             
         self.sort_output.delete("1.0", tk.END)
         self.sort_output.insert("1.0", res)
@@ -249,7 +333,7 @@ class MetallistProApp:
         self.det_manual_s = tk.Entry(self.man_det_frame, width=10, bg="#fff2cc", justify="center")
         self.det_manual_s.insert(0, "5"); self.det_manual_s.grid(row=0, column=3, padx=5, pady=5)
         
-        # Специальное поле для воротниковых фланцев (активируется при переключении на фланец)
+        # Специальное поле для воротниковых фланцев
         self.lbl_flange_dy = ttk.Label(left, text="Для фланцев - условный проход Ду (DN):")
         self.det_flange_dy = ttk.Combobox(left, values=["Ду50", "Ду80", "Ду100", "Ду150", "Ду200", "Ду250", "Ду300", "Ду400", "Ду500", "Ду600", "Ду800", "Ду1000"], state="readonly")
         self.det_flange_dy.set("Ду150")
@@ -262,7 +346,6 @@ class MetallistProApp:
         self.det_output = tk.Text(tab, bg="#ffffff", font=("Consolas", 10), bd=1, relief="solid")
         self.det_output.pack(side="right", fill="both", expand=True, padx=15, pady=15)
         self.toggle_detali_widgets_view()
-
     def toggle_detali_widgets_view(self, event=None):
         t = self.det_type.get()
         if "Фланец" in t:
@@ -292,44 +375,41 @@ class MetallistProApp:
                 s = float(self.det_manual_s.get().strip())
                 angle_val = float(self.det_angle.get())
             except:
-                messagebox.showerror("Ошибка", "Проверьте числовой ввод Диаметра и Стенки отвода!"); return
+                messagebox.showerror("Ошибка", "Проверить числовой ввод Диаметра и Стенки отвода!"); return
                 
-            # Разветвление интегральных радиусов кривизны по ГОСТ/ТУ
+            # Дифференциация радиусов кривизны оси отвода по стандартам СГК
             if "17375" in t:
-                # Отводы типа 3D (Радиус изгиба оси R ≈ 1.5 * DN)
+                # Отводы типа 3D (Радиус изгиба R ≈ 1.5 * DN)
                 R_bend = 1.5 * D
                 st_name = "ГОСТ 17375-2001 (Тип 3D крутоизогнутый)"
             elif "30753" in t:
-                # Отводы типа 2D (Укороченный радиус R ≈ 1.0 * DN для стесненных условий ТЭЦ)
+                # Отводы типа 2D (Укороченный радиус R ≈ 1.0 * DN для камер ТЭЦ)
                 R_bend = 1.0 * D
                 st_name = "ГОСТ 30753-2001 (Тип 2D укороченный)"
             elif "51-515" in t:
-                # Промысловые ТУ отводы повышенной стабильности
+                # Промысловые хладостойкие отводы ТУ
                 R_bend = 1.375 * D
                 st_name = "ТУ 51-515-91 (Промысловый хладостойкий)"
             else:
-                # Магистральные гнутые длинные отводы ГОСТ 24950-81 (Радиус огромный, по умолчанию 15м)
+                # Магистральные гнутые длинные отводы ГОСТ 24950-81 (Огромный радиус, базовый = 15 метров)
                 R_bend = 15000.0
                 st_name = "ГОСТ 24950-81 (Магистральный длинногнутый)"
                 
-            # Инженерная формула объема вытесненного металла участка тора под произвольный угол
-            # V = (angle / 360) * (2 * pi^2 * R * r_mean * s)
-            V_metal = (angle_val / 360.0) * (2.0 * (math.pi ** 2) * R_bend * (D - s) * s)
+            # Теоретическая формула объема вытесненного металла кругового тора под заданный угол:
+            # V = (угол / 360) * (2 * pi^2 * R_изгиба * средний_радиус_трубы * s)
+            V_metal = (angle_val / 360.0) * (2.0 * (math.pi ** 2) * R_bend * ((D - s) / 2.0) * s)
             
-            # Поправка на утолщение стенки на внутреннем радиусе по ТУ
+            # Технологическая поправка на утолщение стенки на внутреннем радиусе по ТУ
             if "51-515" in t: V_metal *= 1.06
             
+            # Масса заготовки в кг с учетом плотности текущей сессии
             w_unit = (V_metal / 1000.0) * (rho / 7.85)
             desc_str = f"{st_name}, угол {int(angle_val)}°, сечение ∅{D}х{s} мм"
             
         total = w_unit * c
         self.det_output.delete("1.0", "end")
         self.det_output.insert("1.0", f"🔧 ВЕДОМОСТЬ ФАСОННЫХ ЭЛЕМЕНТОВ И ОТВОДОВ СГК:\n• Тип изделия по проекту: {t}\n• Нормативная спецификация: {desc_str}\n• Плотность материала сессии: {rho:.2f} г/см³\n• Расчетная масса 1 штуки: {w_unit:.3f} кг\n• Количество в спецификации: {int(c)} шт\n------------------------------------------------------------\n▶ ИТОГОВАЯ СМЕТНАЯ МАССА ПАРТИИ ДЕТАЛЕЙ: {total:.2f} кг\n")
-    def init_metiz_tab(self):
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="🔩 Метизы")
-        
-        # Конфигурация жесткой двухрядной сетки (2 строки на 2 колонки)
+        # Жесткая двухрядная сетка интерфейса (2 строки на 2 колонки)
         tab.grid_rowconfigure(0, weight=1)
         tab.grid_rowconfigure(1, weight=1)
         tab.grid_columnconfigure(0, weight=1)
@@ -340,6 +420,8 @@ class MetallistProApp:
         # ---------------------------------------------------------------------
         f1 = ttk.LabelFrame(tab, text=" БОЛТЫ ЭНЕРГЕТИЧЕСКИЕ ")
         f1.grid(row=0, column=0, padx=10, pady=8, sticky="nsew")
+        
+        # Разметка внутренней сетки только через grid
         f1.grid_columnconfigure(0, weight=1)
         
         self.b_gost = ttk.Combobox(f1, values=["ГОСТ 7798-70 шестигранные", "ГОСТ R 52644-2006 высокопрочные", "ГОСТ 10602-94 крупные (от М42)"], state="readonly")
@@ -394,6 +476,7 @@ class MetallistProApp:
         # ---------------------------------------------------------------------
         f2 = ttk.LabelFrame(tab, text=" ГАЙКИ МАГИСТРАЛЬНЫЕ ")
         f2.grid(row=0, column=1, padx=10, pady=8, sticky="nsew")
+        
         f2.grid_columnconfigure(0, weight=1)
         
         self.n_gost = ttk.Combobox(f2, values=["ГОСТ 5915-70 класс точности Б", "ГОСТ 9064-75 фланцевые для ТЭЦ (до 650°С)", "ГОСТ R 52645-2006 высокопрочные"], state="readonly")
@@ -543,7 +626,7 @@ class MetallistProApp:
     def proc_all_metiz_logic(self):
         rho_coeff = self.get_density() / 7.85
 
-        # --- 1. РАСЧЕТ БОЛТОВ ---
+        # --- 1. БОЛТЫ ---
         base_bolt = {"М10": 0.068, "М12": 0.102, "М16": 0.198, "М20": 0.342, "М24": 0.564, "М30": 0.985, "М36": 1.540, "М42": 2.280, "М48": 3.120}
         bd = self.b_d.get(); bl = float(self.b_l.get()); b_g = self.b_gost.get()
         w_b_base = base_bolt.get(bd, 0.198) * (bl / 90.0)
@@ -564,7 +647,7 @@ class MetallistProApp:
             self.b_pcs_rev.config(state="normal"); self.b_pcs_rev.delete(0, "end"); self.b_pcs_rev.insert(0, str(pcs_r)); self.b_pcs_rev.config(state="readonly")
         except: pass
 
-        # --- 2. РАСЧЕТ ГАЕК ---
+        # --- 2. ГАЕК ---
         base_nut = {"М10": 0.011, "М12": 0.015, "М16": 0.033, "М20": 0.064, "М24": 0.110, "М30": 0.230, "М36": 0.390, "М42": 0.620, "М48": 0.960}
         nd = self.n_d.get(); n_g = self.n_gost.get()
         w_n_base = base_nut.get(nd, 0.033)
@@ -585,7 +668,7 @@ class MetallistProApp:
             self.n_pcs_rev.config(state="normal"); self.n_pcs_rev.delete(0, "end"); self.n_pcs_rev.insert(0, str(pcs_r)); self.n_pcs_rev.config(state="readonly")
         except: pass
 
-        # --- 3. РАСЧЕТ ШАЙБ ---
+        # --- 3. ШАЙБЫ ---
         base_washer = {"М10": 0.004, "М12": 0.006, "М16": 0.011, "М20": 0.017, "М24": 0.032, "М30": 0.054, "М36": 0.092, "М42": 0.182, "М48": 0.274}
         ws = self.w_size.get(); w_g = self.w_gost.get()
         w_w_base = base_washer.get(ws, 0.011)
@@ -608,7 +691,7 @@ class MetallistProApp:
             self.w_pcs_rev.config(state="normal"); self.w_pcs_rev.delete(0, "end"); self.w_pcs_rev.insert(0, str(pcs_r)); self.w_pcs_rev.config(state="readonly")
         except: pass
 
-        # --- 4. РАСЧЕТ ШПИЛЕК И САМОРЕЗОВ ---
+        # --- 4. ШПИЛЬКИ И САМОРЕЗЫ ---
         ss = self.s_size.get()
         w_s_base = 0.00049
         if "М" in ss:
@@ -719,9 +802,9 @@ class MetallistProApp:
         
         btn_exit = ttk.Button(f_r2, text="Выход", command=self.root.quit)
         btn_exit.pack(side="right", padx=15)
-        
         self.rebuild_weld_grid()
         self.sync_welding_tab_electrodes()
+
     def sync_welding_tab_electrodes(self, event=None):
         mat = self.w_mat_type.get()
         if mat == "Сталь": self.w_el_cat.set("Углеродистая и низколегированная сталь")
@@ -783,6 +866,99 @@ class MetallistProApp:
             ttk.Label(self.dyn_grid_frame, text=f"- {lbl}").grid(row=r, column=1, padx=2, pady=2, sticky="w")
             self.w_inputs[lbl] = e
         self.redraw_gost_canvas_shapes()
+    def redraw_gost_canvas_shapes(self):
+        self.w_canvas.delete("all")
+        joint = self.w_joint_type.get()
+        cx, cy = 220, 110
+        
+        def draw_arrow(x1, y1, x2, y2, label="", txt_x=0, txt_y=0):
+            self.w_canvas.create_line(x1, y1, x2, y2, fill="#130f40", width=1, arrow="both", arrowshape=(8,10,3))
+            if label: self.w_canvas.create_text(txt_x if txt_x else (x1+x2)/2, txt_y if txt_y else (y1+y2)/2-10, text=label, font=("Segoe UI", 9, "bold"), fill="#2c3e50")
+
+        if joint in ["C2", "C8"]:
+            self.w_canvas.create_rectangle(40, cy-15, 185, cy+15, fill="#dcdde1", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_rectangle(235, cy-15, 380, cy+15, fill="#dcdde1", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_oval(175, cy-22, 245, cy+12, fill="#ff8000", outline="#d35400", width=1.5)
+            draw_arrow(185, cy+28, 235, cy+28, "b")
+            draw_arrow(175, cy-32, 245, cy-32, "e")
+            draw_arrow(210, cy-22, 210, cy-15, "g", txt_x=225, txt_y=cy-25)
+            draw_arrow(390, cy-15, 390, cy+15, "S", txt_x=405)
+            self.w_canvas.create_line(40, cy, 380, cy, fill="#7f8c8d", dash=(6,4))
+            draw_arrow(50, cy-50, 50, cy, "D", txt_x=65, txt_y=cy-25)
+        elif joint == "C17":
+            self.w_canvas.create_polygon(40,cy-20, 150,cy-20, 180,cy+20, 40,cy+20, fill="#dcdde1", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_polygon(380,cy-20, 270,cy-20, 240,cy+20, 380,cy+20, fill="#dcdde1", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_oval(165, cy-28, 255, cy+15, fill="#ff8000", outline="#d35400", width=1.5)
+            draw_arrow(180, cy+32, 240, cy+32, "b")
+            draw_arrow(165, cy-38, 255, cy-38, "e")
+            draw_arrow(390, cy-20, 390, cy+20, "S", txt_x=405)
+            self.w_canvas.create_arc(130, cy-35, 190, cy+5, start=315, extent=45, style="arc", outline="red", width=1.5)
+            self.w_canvas.create_text(135, cy-10, text="A°", font=("Segoe UI", 9, "bold"), fill="red")
+        elif joint in ["У5", "У7", "У8"]:
+            self.w_canvas.create_rectangle(210, cy-70, 320, cy+70, fill="#b2bec3", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_rectangle(60, cy-20, 210, cy+20, fill="#dcdde1", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_polygon(210,cy-20, 210,cy-50, 175,cy-20, fill="#ff8000", outline="#d35400", width=1.5)
+            self.w_canvas.create_polygon(210,cy+20, 210,cy+50, 175,cy+20, fill="#ff8000", outline="#d35400", width=1.5)
+            draw_arrow(335, cy-70, 335, cy+70, "S1", txt_x=355)
+            draw_arrow(45, cy-20, 45, cy+20, "S", txt_x=30)
+        else:
+            self.w_canvas.create_rectangle(60, cy-25, 240, cy, fill="#dcdde1", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_rectangle(150, cy, 340, cy+25, fill="#b2bec3", outline="#7f8c8d", width=1.5)
+            self.w_canvas.create_polygon(150,cy, 150,cy-25, 120,cy, fill="#ff8000", outline="#d35400", width=1.5)
+            draw_arrow(160, cy-20, 160, cy, "k", txt_x=175)
+
+    def process_gost_welding_calculations(self):
+        joint = self.w_joint_type.get(); rho = self.get_density()
+        self.out_e.delete(0, "end"); self.out_el_mass.delete(0, "end")
+        try:
+            if joint in ["C2", "C8"]:
+                n = float(self.w_inputs["кол-во св. швов"].get())
+                D = float(self.w_inputs["диаметр трубы (D), мм"].get())
+                S = float(self.w_inputs["толщина стенки (S), мм"].get())
+                b = float(self.w_inputs["зазор после прихватки (b), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                c = float(self.w_inputs["притупление кромки (c), мм"].get()) if "притупление кромки (c), мм" in self.w_inputs else 0.5
+                A = float(self.w_inputs["угол фаски (A°)"].get()) if "угол фаски (A°)" in self.w_inputs else 50.0
+                e = b + 2 * (S - c) * math.tan(math.radians(A)) + 2
+                F_w = ((b + (e - 2)) / 2) * (S - c) + (b * c) + (2 / 3 * e * g)
+                L_w = math.pi * (D - S); m_dep = (F_w * L_w * rho / 1000000) * n
+            elif joint == "C17":
+                n = float(self.w_inputs["кол-во св. швов"].get())
+                D = float(self.w_inputs["диаметр трубы (D), мм"].get())
+                S = float(self.w_inputs["толщина стенки (S), мм"].get())
+                b = float(self.w_inputs["зазор после прихватки (b), мм"].get())
+                c = float(self.w_inputs["притупление кромки (c), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                A = float(self.w_inputs["угол фаски (A°)"].get())
+                e = b + 2 * (S - c) * math.tan(math.radians(A)) + 2
+                F_w = ((b + (e - 2)) / 2) * (S - c) + (b * c) + (2 / 3 * e * g)
+                L_w = math.pi * (D - S); m_dep = (F_w * L_w * rho / 1000000) * n
+            elif joint in ["У5", "У7", "У8"]:
+                n = float(self.w_inputs["кол-во св. швов"].get())
+                D = float(self.w_inputs["диаметр трубы (D), мм"].get())
+                S = float(self.w_inputs["толщина стенки (S), мм"].get())
+                S1 = float(self.w_inputs["толщина фланца (S1), мм"].get())
+                b = float(self.w_inputs["зазор после прихватки (b), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                e = S + S1 + b + 1.5; K = S + 1; K1 = S1 + 1; F_w = (0.5 * K * K1) + (2 / 3 * max(K, K1) * g)
+                L_w = math.pi * D; m_dep = (F_w * L_w * rho / 1000000) * n
+            else:
+                S = float(self.w_inputs["толщина листа (S), мм"].get())
+                L_w = float(self.w_inputs["Длина шва, мм"].get())
+                k = float(self.w_inputs["Катет шва (k), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                e = k + 2; F_w = (0.5 * k * k) + (2 / 3 * e * g); m_dep = (F_w * L_w * rho / 1000000)
+            
+            mark = self.w_el_mark.get()
+            rate_coeff = 1.62
+            if mark in ["УОНИ-13/45", "ОЗС-4"]: rate_coeff = 1.60
+            elif mark in ["МР-3", "АНО-4"]: rate_coeff = 1.70
+            elif mark == "ОЗС-6": rate_coeff = 1.50
+            
+            self.out_e.insert(0, f"{round(e, 1)}")
+            self.out_el_mass.insert(0, f"{m_dep * rate_coeff:.3f}")
+        except Exception: 
+            messagebox.showerror("Ошибка", "Проверить числовые параметры!")
     def init_electrodes_tab(self):
         tab = ttk.Frame(self.notebook); self.notebook.add(tab, text="📖 Справочник электродов")
         ttk.Label(tab, text="Выбор марки электрода в зависимости от свариваемого материала конструкции", font=("Segoe UI", 11, "bold")).pack(pady=8, anchor="w", padx=15)
