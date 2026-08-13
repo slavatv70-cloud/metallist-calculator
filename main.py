@@ -7,7 +7,7 @@ class MetallistProApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Калькулятор Металлиста PRO — Сметная группа СГК")
-        self.root.geometry("1280x960")
+        self.root.geometry("1400x1000")
         
         # Настройка графической темы
         self.style = ThemedStyle(self.root)
@@ -60,7 +60,7 @@ class MetallistProApp:
         """Создание нижнего колонтитула"""
         footer = tk.Frame(self.root, bg="#2c3e50", height=32)
         footer.pack(fill="x", side="bottom", pady=(5, 0))
-        footer_text = "Разработчик Тищенко Вячеслав Владимирович, сметная группа г.Назарово ООО \"СГК\" 2026г. версия 2"
+        footer_text = "Разработчик Тищенко Вячеслав Владимирович, сметная группа г.Назарово ООО \"СГК\" 2026г. версия 3.0"
         lbl_footer = tk.Label(footer, text=footer_text, foreground="#ff8c00", background="#2c3e50", font=("Segoe UI", 11, "bold"))
         lbl_footer.pack(pady=4)
 
@@ -90,6 +90,30 @@ class MetallistProApp:
             if key in mat:
                 return value
         return 7.85
+
+    def get_electrode_group(self, mark):
+        """Определение группы электродов по марке согласно Сборнику 30"""
+        group1 = ["ЛБ-52А", "ВСФ-65У", "ВСФ-75У", "ВСФ-85", "ОЗШ-1", "ВСЦ-4А", "ОЗЛ-25Б"]
+        group2 = ["УОНИ-13/45", "АНО-11", "ТМУ-21У", "ОЗС-18", "ОЗС-6", "ОЗС-17Н", "ВСЦ-4", 
+                  "ВСЦ-60", "ТМЛ-1У", "ТМЛ-3У", "УТ-28", "ОЗЛ-5", "ОЗЛ-29", "ОЗЛ-25", "ОЗЛ-36", "АНВ-20"]
+        group3 = ["ОЗЛ-8", "ОЗЛ-7", "ОЗЛ-14А", "НИИАТ-1", "ОЗЛ-3", "ОЗЛ-21", "ОЗЛ-23", "ВН-48", 
+                  "УОНИ-13/55К", "ЦУ-5", "ДСК-50", "ОЗС-25", "СК2-50", "УОНИ-13/55У", "УОНИ-13/65", 
+                  "АНП-2", "УОНИ-13/85", "НИАТ-3М", "АНО-5", "ОЗС-23", "АНО-4", "АНО-14", "ОЗС-4", 
+                  "ОЗС-22Н", "ОЗС-22Р", "ТМЛ-4В", "ЦЛ-39", "СМВ-96", "СМВ-95", "СМА-96", "ОЗЛ-6", 
+                  "КТИ-7А", "ОЗЛ-2", "ОЗЛ-35", "АНЖР-2"]
+        group4 = ["ОЗЛ-37-1", "СМ-11", "УОНИ-13/55", "ОЗС-24", "АНО-6", "АНО-18", "ОЗС-12", "МР-3", 
+                  "ОЗС-21", "ОМА-2", "ОЗЛ-9А", "ГС-1", "АНЖР-1", "АНЖР-3У", "ОЗЛ-19", "НИИ-48Г", 
+                  "УОНИ-13/НК", "ЦЛ-11", "ЦЛ-15", "ЦЛ-9", "ОЗЛ-17У"]
+        
+        if mark in group1:
+            return 1, 1.4
+        elif mark in group2:
+            return 2, 1.5
+        elif mark in group3:
+            return 3, 1.6
+        elif mark in group4:
+            return 4, 1.7
+        return 3, 1.6  # По умолчанию группа III
 
     # ==================== ВКЛАДКА 1: ГЕОМЕТРИЯ ====================
     def init_geometry_tab(self):
@@ -448,7 +472,7 @@ class MetallistProApp:
                 messagebox.showerror("Ошибка", "Проверьте ввод диаметра и стенки отвода!")
                 return
             
-            # Справочные данные для отводов 90°
+            # Справочные данные для отводов 90° по ГОСТ 17375 и ГОСТ 30753
             gost_data = {
                 "17375": [(57,3.5,0.7), (89,4,2.1), (108,4,3.3), (159,5,8.1), (219,6,17.2), (273,7,33.5), (325,8,51.4), (426,9,98.6), (530,10,173.0)],
                 "30753": [(57,3.5,0.5), (89,4,1.4), (108,4,2.1), (159,5,5.3), (219,6,11.4), (273,7,21.6), (325,8,33.1), (426,9,63.8), (530,10,111.0)]
@@ -467,8 +491,16 @@ class MetallistProApp:
                 w_unit = (base_w_90 / 90.0) * angle_val * (rho / 7.85)
                 desc_str = f"Табличный ГОСТ {gost_key}, угол {int(angle_val)}°, ∅{D}х{s}"
             else:
-                # Геометрический расчет
-                R_bend = 1.5 * D if "17375" in t else 1.0 * D if "30753" in t else 1.375 * D if "51-515" in t else 15000.0
+                # Геометрический расчет по Сборнику 30
+                if "17375" in t:
+                    R_bend = 1.5 * D
+                elif "30753" in t:
+                    R_bend = 1.0 * D
+                elif "51-515" in t:
+                    R_bend = 1.375 * D
+                else:
+                    R_bend = 15000.0
+                
                 V_metal = ((angle_val / 360.0) * (2.0 * math.pi**2 * R_bend * ((D - s) / 2.0) * s)) / 1000000.0
                 if "51-515" in t:
                     V_metal *= 1.06
@@ -870,423 +902,596 @@ class MetallistProApp:
         entry.insert(0, value)
         entry.config(state="readonly")
 
-    # ==================== ВКЛАДКА 5: СВАРКА ====================
+    # ==================== ВКЛАДКА 5: СВАРКА (ПЕРЕРАБОТАНА ПО СБОРНИКУ 30) ====================
     def init_welding_tab(self):
-        """Инициализация вкладки Сварка с детализированными чертежами"""
+        """Инициализация вкладки Сварка по Сборнику 30"""
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="⚡ Сварка")
         
-        # Верхняя часть - исходные данные и чертеж
-        top_frame = ttk.Frame(tab)
-        top_frame.pack(fill="x", padx=15, pady=5)
+        # Основной контейнер
+        main_frame = ttk.Frame(tab)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=5)
         
-        # Левая панель - параметры
-        input_frame = ttk.LabelFrame(top_frame, text=" Исходные данные ")
-        input_frame.pack(side="left", fill="both", expand=True, padx=(0,10))
+        # Верхняя панель - выбор типа соединения
+        top_frame = ttk.LabelFrame(main_frame, text=" Параметры сварного соединения ")
+        top_frame.pack(fill="x", pady=5)
         
-        # Выбор типа соединения
-        ttk.Label(input_frame, text="Соединение:").grid(row=0, column=0, padx=5, pady=3, sticky="w")
-        self.w_joint_type = ttk.Combobox(input_frame, values=[
-            "C2", "C8", "C17", "У5", "У7", "У8",
-            "Н1", "Н2", "Т1", "Т3", "У4"
-        ], state="readonly", width=10)
-        self.w_joint_type.set("C17")
-        self.w_joint_type.grid(row=0, column=1, padx=5, pady=3, sticky="w")
-        self.w_joint_type.bind("<<ComboboxSelected>>", self.on_weld_joint_change)
+        # Строка 1: Раздел и тип соединения
+        row1 = ttk.Frame(top_frame)
+        row1.pack(fill="x", pady=3)
         
-        # Выбор материала
-        ttk.Label(input_frame, text="Материал:").grid(row=1, column=0, padx=5, pady=3, sticky="w")
-        self.w_mat_type = ttk.Combobox(input_frame, values=["Сталь", "Нержавеющая сталь", "Алюминий", "Медь"], state="readonly", width=18)
-        self.w_mat_type.set("Сталь")
-        self.w_mat_type.grid(row=1, column=1, padx=5, pady=3, sticky="w")
-        self.w_mat_type.bind("<<ComboboxSelected>>", self.on_weld_material_change)
+        ttk.Label(row1, text="Раздел:").pack(side="left", padx=5)
+        self.weld_section = ttk.Combobox(row1, values=[
+            "Раздел I. Сварка листовых и решетчатых конструкций",
+            "Раздел II. Сварка трубопроводов",
+            "Раздел III. Сварка арматуры и закладных деталей",
+            "Раздел IV. Газовая резка"
+        ], state="readonly", width=40)
+        self.weld_section.set("Раздел I. Сварка листовых и решетчатых конструкций")
+        self.weld_section.pack(side="left", padx=5)
+        self.weld_section.bind("<<ComboboxSelected>>", self.on_weld_section_change)
         
-        # Выбор положения шва
-        ttk.Label(input_frame, text="Положение шва:").grid(row=2, column=0, padx=5, pady=3, sticky="w")
-        self.w_pos_type = ttk.Combobox(input_frame, values=["Нижнее", "Вертикальное", "Потолочное", "Горизонтальное"], state="readonly", width=15)
-        self.w_pos_type.set("Нижнее")
-        self.w_pos_type.grid(row=2, column=1, padx=5, pady=3, sticky="w")
-        self.w_pos_type.bind("<<ComboboxSelected>>", self.update_welding_current)
+        ttk.Label(row1, text="Тип соединения:").pack(side="left", padx=5)
+        self.weld_joint_type = ttk.Combobox(row1, values=[], state="readonly", width=15)
+        self.weld_joint_type.pack(side="left", padx=5)
+        self.weld_joint_type.bind("<<ComboboxSelected>>", self.on_weld_joint_change)
         
-        # Динамические поля параметров
-        self.weld_params_frame = ttk.Frame(input_frame)
-        self.weld_params_frame.grid(row=3, column=0, columnspan=2, pady=5, sticky="ew")
+        # Строка 2: Материал и положение шва
+        row2 = ttk.Frame(top_frame)
+        row2.pack(fill="x", pady=3)
+        
+        ttk.Label(row2, text="Материал:").pack(side="left", padx=5)
+        self.weld_material = ttk.Combobox(row2, values=["Сталь", "Нержавеющая сталь", "Алюминий", "Медь"], state="readonly", width=18)
+        self.weld_material.set("Сталь")
+        self.weld_material.pack(side="left", padx=5)
+        
+        ttk.Label(row2, text="Положение шва:").pack(side="left", padx=5)
+        self.weld_position = ttk.Combobox(row2, values=["Нижнее", "Вертикальное", "Горизонтальное", "Потолочное"], state="readonly", width=15)
+        self.weld_position.set("Нижнее")
+        self.weld_position.pack(side="left", padx=5)
+        
+        ttk.Label(row2, text="Метод сварки:").pack(side="left", padx=5)
+        self.weld_method = ttk.Combobox(row2, values=[
+            "Ручная дуговая (электроды)",
+            "Механизированная в CO2",
+            "Автоматическая под флюсом",
+            "Газовая",
+            "Аргонодуговая",
+            "Комбинированная"
+        ], state="readonly", width=25)
+        self.weld_method.set("Ручная дуговая (электроды)")
+        self.weld_method.pack(side="left", padx=5)
+        self.weld_method.bind("<<ComboboxSelected>>", self.on_weld_method_change)
+        
+        # Строка 3: Марка электрода и диаметр
+        row3 = ttk.Frame(top_frame)
+        row3.pack(fill="x", pady=3)
+        
+        ttk.Label(row3, text="Марка электрода:").pack(side="left", padx=5)
+        self.weld_electrode = ttk.Combobox(row3, values=[], state="readonly", width=18)
+        self.weld_electrode.pack(side="left", padx=5)
+        self.weld_electrode.bind("<<ComboboxSelected>>", self.update_electrode_info)
+        
+        ttk.Label(row3, text="Диаметр электрода, мм:").pack(side="left", padx=5)
+        self.weld_diameter = ttk.Combobox(row3, values=["2.0", "2.5", "3.0", "4.0", "5.0", "6.0"], width=6, state="readonly")
+        self.weld_diameter.set("3.0")
+        self.weld_diameter.pack(side="left", padx=5)
+        
+        # Информация о группе электрода
+        self.electrode_group_label = ttk.Label(row3, text="Группа: I, K=1.4", foreground="#2980b9")
+        self.electrode_group_label.pack(side="left", padx=15)
+        
+        # Строка 4: Параметры соединения (динамические)
+        self.params_frame = ttk.LabelFrame(top_frame, text=" Параметры соединения ")
+        self.params_frame.pack(fill="x", pady=5, padx=5)
         self.weld_params = {}
         
         # Кнопка расчета
-        ttk.Button(input_frame, text="Считать", command=self.calc_weld).grid(row=4, column=1, padx=5, pady=5, sticky="e")
+        btn_frame = ttk.Frame(top_frame)
+        btn_frame.pack(fill="x", pady=5)
+        ttk.Button(btn_frame, text="Рассчитать по нормам Сборника 30", command=self.calc_weld_by_sbornik).pack(side="right", padx=5)
         
-        # Правая панель - чертеж
-        self.weld_canvas = tk.Canvas(top_frame, bg="#ffffff", width=520, height=280, bd=1, relief="solid")
-        self.weld_canvas.pack(side="right", fill="both", expand=True)
+        # Панель результатов
+        result_frame = ttk.LabelFrame(main_frame, text=" Результаты расчета по Сборнику 30 ")
+        result_frame.pack(fill="both", expand=True, pady=5)
         
-        # Средняя часть - выбор электродов
-        mid_frame = ttk.Frame(tab)
-        mid_frame.pack(fill="x", padx=15, pady=5)
+        # Таблица результатов
+        self.result_tree = ttk.Treeview(result_frame, columns=("param", "value", "unit"), show="headings", height=8)
+        self.result_tree.heading("param", text="Параметр")
+        self.result_tree.heading("value", text="Значение")
+        self.result_tree.heading("unit", text="Ед. изм.")
+        self.result_tree.column("param", width=250)
+        self.result_tree.column("value", width=150)
+        self.result_tree.column("unit", width=100)
+        self.result_tree.pack(fill="both", expand=True, padx=5, pady=5)
         
-        electrod_frame = ttk.LabelFrame(mid_frame, text=" Выбор сварочного материала ")
-        electrod_frame.pack(fill="x", pady=2)
-        
-        self.w_el_cat = ttk.Combobox(electrod_frame, values=[
-            "Углеродистая сталь", "Легированная сталь", 
-            "Теплоустойчивая сталь", "Нержавеющая сталь",
-            "Алюминий", "Медь и сплавы", "Чугун"
-        ], state="readonly", width=30)
-        self.w_el_cat.set("Углеродистая сталь")
-        self.w_el_cat.pack(side="left", padx=10, pady=5)
-        self.w_el_cat.bind("<<ComboboxSelected>>", self.update_electrode_marks)
-        
-        self.w_el_mark = ttk.Combobox(electrod_frame, values=[], state="readonly", width=15)
-        self.w_el_mark.pack(side="left", padx=5, pady=5)
-        self.w_el_mark.bind("<<ComboboxSelected>>", self.update_welding_current)
-        
-        ttk.Label(electrod_frame, text="Диаметр, мм:").pack(side="left", padx=10)
-        self.w_el_dia = ttk.Combobox(electrod_frame, values=["2.0", "2.5", "3.0", "4.0", "5.0", "6.0"], width=6, state="readonly")
-        self.w_el_dia.set("3.0")
-        self.w_el_dia.pack(side="left", padx=5, pady=5)
-        self.w_el_dia.bind("<<ComboboxSelected>>", self.update_welding_current)
-        
-        # Нижняя часть - результаты
-        result_frame = ttk.LabelFrame(tab, text=" Расчетные показатели ")
-        result_frame.pack(fill="x", padx=15, pady=5)
-        
-        row1 = ttk.Frame(result_frame)
-        row1.pack(fill="x", pady=4)
-        
-        self.out_e = ttk.Entry(row1, width=10, font=("Consolas", 10, "bold"), justify="center")
-        self.out_e.pack(side="left", padx=10)
-        ttk.Label(row1, text="- ширина шва (e), мм").pack(side="left")
-        
-        ttk.Label(row1, text="РЕКОМЕНДУЕМЫЙ ТОК:").pack(side="right", padx=5)
-        self.out_current = ttk.Entry(row1, width=15, font=("Consolas", 10, "bold"), justify="center")
-        self.out_current.pack(side="right", padx=15)
-        
-        row2 = ttk.Frame(result_frame)
-        row2.pack(fill="x", pady=4)
-        
-        self.out_el_mass = ttk.Entry(row2, width=10, font=("Consolas", 10, "bold"), justify="center")
-        self.out_el_mass.pack(side="left", padx=10)
-        ttk.Label(row2, text="- расход электродов, кг").pack(side="left")
-        
-        ttk.Button(row2, text="Выход", command=self.root.quit).pack(side="right", padx=15)
+        # Подробный вывод
+        self.result_text = tk.Text(result_frame, bg="#f8f9fa", font=("Consolas", 10), height=6, bd=1, relief="solid")
+        self.result_text.pack(fill="x", padx=5, pady=5)
         
         # Инициализация
+        self.update_weld_joint_types()
+        self.update_electrode_list()
         self.build_weld_params()
-        self.update_electrode_marks()
-        self.draw_weld_joint()
+
+    def on_weld_section_change(self, event=None):
+        """Обработка смены раздела сварки"""
+        self.update_weld_joint_types()
+        self.build_weld_params()
+
+    def update_weld_joint_types(self):
+        """Обновление списка типов соединений в зависимости от раздела"""
+        section = self.weld_section.get()
+        joints = {
+            "Раздел I. Сварка листовых и решетчатых конструкций": [
+                "C1 (Стыковое с отбортовкой)", "C2 (Стыковое без скоса)", 
+                "C7 (Стыковое без скоса двустороннее)", "C8 (Стыковое со скосом одной кромки)",
+                "C15 (Стыковое с двумя скосами)", "C17 (Стыковое со скосом двух кромок)",
+                "C25 (Стыковое с двумя скосами двустороннее)",
+                "У1 (Угловое с отбортовкой)", "У4 (Угловое без скоса)", 
+                "У6 (Угловое со скосом)", "У8 (Угловое с двумя скосами)",
+                "У9 (Угловое со скосом двух кромок)",
+                "Т1 (Тавровое без скоса)", "Т3 (Тавровое без скоса двустороннее)",
+                "Т6 (Тавровое со скосом)", "Т8 (Тавровое с двумя скосами)",
+                "Н1 (Нахлёсточное)", "Н2 (Нахлёсточное двустороннее)"
+            ],
+            "Раздел II. Сварка трубопроводов": [
+                "С2 (Стыковое без скоса)",
+                "С8 (Стыковое со скосом одной кромки)",
+                "С17 (Стыковое со скосом двух кромок)",
+                "С18 (Стыковое на съемной подкладке)",
+                "С5 (Стыковое на остающейся подкладке)",
+                "С10 (Стыковое горизонтальное на подкладке)",
+                "С19 (Стыковое на остающейся подкладке)",
+                "С52 (Стыковое криволинейное)",
+                "С53 (Стыковое криволинейное)",
+                "У18 (Вварка патрубков без скоса)",
+                "У19 (Вварка патрубков со скосом)",
+                "У5 (Приварка фланцев У5)",
+                "У7 (Приварка фланцев У7)",
+                "У8 (Приварка фланцев У8)"
+            ],
+            "Раздел III. Сварка арматуры и закладных деталей": [
+                "Тип 2 (Крестообразное точечное)",
+                "Тип 3 (Крестообразное с формированием)",
+                "Тип 5 (Стыковое в формах)",
+                "Тип 6 (Стыковое со скосом)",
+                "Тип 7 (Стыковое вертикальное)",
+                "Тип 9 (На скобе-подкладке)",
+                "Тип 10 (На скобе-накладке)",
+                "Тип 11 (Вертикальное с разделкой)",
+                "Тип 12 (Нахлёсточное)",
+                "Тип 13 (Нахлёсточное)",
+                "Тип 14 (Нахлёсточное)",
+                "Тип 18 (Тавровое)",
+                "Тип 20 (Тавровое)",
+                "Тип 21 (Тавровое)"
+            ],
+            "Раздел IV. Газовая резка": [
+                "Резка листовой стали",
+                "Резка угловой стали",
+                "Резка двутавров",
+                "Резка швеллеров",
+                "Резка квадрата",
+                "Резка круга",
+                "Резка рельсов",
+                "Резка труб",
+                "Вырезка отверстий"
+            ]
+        }
+        self.weld_joint_type['values'] = joints.get(section, [])
+        if joints.get(section):
+            self.weld_joint_type.set(joints[section][0])
+
+    def update_electrode_list(self):
+        """Обновление списка электродов в зависимости от раздела"""
+        method = self.weld_method.get()
+        section = self.weld_section.get()
+        
+        if "Ручная дуговая" in method:
+            electrodes = ["УОНИ-13/45", "УОНИ-13/55", "АНО-4", "МР-3", "ОЗС-4", "ОЗС-6", 
+                         "ТМУ-21У", "ОЗС-12", "УОНИ-13/85", "ЦЛ-6", "ЦУ-2М", "ОЗЛ-6", "ОЗЛ-8"]
+        elif "CO2" in method or "Механизированная" in method:
+            electrodes = ["Св-08Г2С", "Св-08ГС", "Св-10Г2", "ПП-АН8", "ПП-АН9"]
+        elif "под флюсом" in method:
+            electrodes = ["Св-08А", "Св-10ГА", "Св-10Г2", "Св-08ГА"]
+        elif "Газовая" in method:
+            electrodes = ["Св-08", "Св-08А", "Св-10Г2"]
+        elif "Аргонодуговая" in method:
+            electrodes = ["Св-04Х19Н9", "Св-08Х19Н10Б", "Св-10Х17Н13М2Т", "Св-10Х25Н13"]
+        elif "Комбинированная" in method:
+            electrodes = ["УОНИ-13/45 + Св-08Г2С", "УОНИ-13/55 + Св-08Г2С"]
+        else:
+            electrodes = []
+        
+        self.weld_electrode['values'] = electrodes
+        if electrodes:
+            self.weld_electrode.set(electrodes[0])
+            self.update_electrode_info()
+
+    def update_electrode_info(self, event=None):
+        """Обновление информации о группе электрода"""
+        mark = self.weld_electrode.get()
+        if mark:
+            group, coeff = self.get_electrode_group(mark)
+            group_names = {1: "I", 2: "II", 3: "III", 4: "IV"}
+            self.electrode_group_label.config(text=f"Группа: {group_names.get(group, 'III')}, K={coeff}")
+
+    def on_weld_method_change(self, event=None):
+        """Обработка смены метода сварки"""
+        self.update_electrode_list()
+        self.build_weld_params()
 
     def on_weld_joint_change(self, event=None):
         """Обработка смены типа соединения"""
         self.build_weld_params()
-        self.draw_weld_joint()
-        self.calc_weld()
-
-    def on_weld_material_change(self, event=None):
-        """Обработка смены материала"""
-        mat = self.w_mat_type.get()
-        mat_map = {
-            "Сталь": "Углеродистая сталь",
-            "Нержавеющая сталь": "Нержавеющая сталь",
-            "Алюминий": "Алюминий",
-            "Медь": "Медь и сплавы"
-        }
-        if mat in mat_map:
-            self.w_el_cat.set(mat_map[mat])
-            self.update_electrode_marks()
 
     def build_weld_params(self):
-        """Построение полей параметров сварки"""
-        for w in self.weld_params_frame.winfo_children():
+        """Построение полей параметров для текущего соединения"""
+        for w in self.params_frame.winfo_children():
             w.destroy()
         self.weld_params.clear()
         
-        joint = self.w_joint_type.get()
-        params = {
-            "C2": [("кол-во швов", "1"), ("D, мм", "60"), ("S, мм", "3"), ("b, мм", "1"), ("c, мм", "0.5"), ("g, мм", "2"), ("α°", "50")],
-            "C8": [("кол-во швов", "1"), ("D, мм", "60"), ("S, мм", "3"), ("b, мм", "1"), ("c, мм", "0.5"), ("g, мм", "2"), ("α°", "50")],
-            "C17": [("кол-во швов", "1"), ("D, мм", "20"), ("S, мм", "3"), ("b, мм", "1"), ("c, мм", "0.5"), ("g, мм", "2"), ("α°", "30")],
-            "У5": [("кол-во швов", "1"), ("D, мм", "108"), ("S, мм", "4"), ("S1, мм", "4"), ("b, мм", "0.5"), ("g, мм", "1")],
-            "У7": [("кол-во швов", "1"), ("D, мм", "108"), ("S, мм", "4"), ("S1, мм", "4"), ("b, мм", "0.5"), ("g, мм", "1")],
-            "У8": [("кол-во швов", "1"), ("D, мм", "108"), ("S, мм", "4"), ("S1, мм", "4"), ("b, мм", "0.5"), ("g, мм", "1")],
-        }
+        joint = self.weld_joint_type.get()
+        section = self.weld_section.get()
+        method = self.weld_method.get()
         
-        # Для листовых соединений
-        if joint in ["Н1", "Н2"]:
-            params[joint] = [("S, мм", "5"), ("L, мм", "100"), ("l, мм", "30"), ("g, мм", "1")]
-        elif joint in ["Т1", "Т3"]:
-            params[joint] = [("S, мм", "5"), ("L, мм", "100"), ("g, мм", "1")]
-        elif joint == "У4":
-            params[joint] = [("S, мм", "5"), ("L, мм", "100"), ("g, мм", "1")]
+        params = []
         
-        for row, (lbl, val) in enumerate(params.get(joint, [])):
-            ttk.Label(self.weld_params_frame, text=lbl).grid(row=row, column=0, padx=5, pady=2, sticky="w")
-            e = ttk.Entry(self.weld_params_frame, width=8, justify="center")
+        if "Раздел I" in section:
+            if "C" in joint or "С" in joint:
+                params = [
+                    ("Толщина деталей S, мм", "4"),
+                    ("Длина шва L, м", "1.0"),
+                    ("Количество швов n", "1")
+                ]
+                if "C8" in joint or "C15" in joint or "C17" in joint or "C25" in joint:
+                    params.append(("Угол скоса α°, град", "50"))
+            elif "У" in joint:
+                params = [
+                    ("Катет шва K, мм", "4"),
+                    ("Длина шва L, м", "1.0"),
+                    ("Количество швов n", "1")
+                ]
+            elif "Т" in joint:
+                params = [
+                    ("Катет шва K, мм", "4"),
+                    ("Длина шва L, м", "1.0"),
+                    ("Количество швов n", "1")
+                ]
+            elif "Н" in joint:
+                params = [
+                    ("Катет шва K, мм", "4"),
+                    ("Длина шва L, м", "1.0"),
+                    ("Количество швов n", "1")
+                ]
+        elif "Раздел II" in section:
+            if "С2" in joint or "С8" in joint:
+                params = [
+                    ("Толщина стенки S, мм", "4"),
+                    ("Диаметр трубы D, мм", "57"),
+                    ("Количество стыков", "1")
+                ]
+            else:
+                params = [
+                    ("Толщина стенки S, мм", "4"),
+                    ("Диаметр трубы D, мм", "57"),
+                    ("Количество стыков", "1")
+                ]
+            if "фланец" in joint.lower():
+                params.append(("Толщина фланца S1, мм", "4"))
+        elif "Раздел III" in section:
+            params = [
+                ("Диаметр стержня d, мм", "20"),
+                ("Количество соединений", "1")
+            ]
+            if "крестообразное" in joint.lower():
+                params.append(("Расстояние между стержнями", "100"))
+        elif "Раздел IV" in section:
+            params = [
+                ("Толщина металла S, мм", "10"),
+                ("Длина реза L, м", "1.0")
+            ]
+            if "труб" in joint.lower() or "отверстий" in joint.lower():
+                params.append(("Диаметр трубы D, мм", "57"))
+        
+        # Добавление параметров в интерфейс
+        for row, (lbl, val) in enumerate(params):
+            ttk.Label(self.params_frame, text=lbl).grid(row=row, column=0, padx=5, pady=3, sticky="w")
+            e = ttk.Entry(self.params_frame, width=10, justify="center")
             e.insert(0, val)
-            e.grid(row=row, column=1, padx=5, pady=2)
+            e.grid(row=row, column=1, padx=5, pady=3)
             self.weld_params[lbl] = e
 
-    def draw_weld_joint(self):
-        """Отрисовка детализированного чертежа сварного соединения"""
-        self.weld_canvas.delete("all")
-        joint = self.w_joint_type.get()
-        w = self.weld_canvas.winfo_width()
-        h = self.weld_canvas.winfo_height()
-        if w < 100:
-            w = 520
-        if h < 100:
-            h = 280
-        cx, cy = w // 2, h // 2
-        
-        # Функции для отрисовки
-        def draw_part(x1, y1, x2, y2, color="#bdc3c7"):
-            self.weld_canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#34495e", width=2)
-        
-        def draw_weld(points, color="#ff8000"):
-            self.weld_canvas.create_polygon(points, fill=color, outline="#d35400", width=2, stipple="gray25")
-            self.weld_canvas.create_polygon(points, fill="", outline="#d35400", width=2)
-        
-        def draw_dim(x1, y1, x2, y2, label, offset=20, color="#2980b9"):
-            self.weld_canvas.create_line(x1, y1, x2, y2, fill=color, width=1.5, dash=(4, 2))
-            self.weld_canvas.create_line(x1, y1, x1-6, y1-5, fill=color, width=1.5)
-            self.weld_canvas.create_line(x1, y1, x1-6, y1+5, fill=color, width=1.5)
-            self.weld_canvas.create_line(x2, y2, x2+6, y2-5, fill=color, width=1.5)
-            self.weld_canvas.create_line(x2, y2, x2+6, y2+5, fill=color, width=1.5)
-            self.weld_canvas.create_text((x1+x2)//2, y1-offset, text=label, font=("Segoe UI", 10, "bold"), fill=color)
-        
-        # Легенда
-        self.weld_canvas.create_rectangle(10, 10, 210, 85, fill="#f8f9fa", outline="#dee2e6")
-        self.weld_canvas.create_text(110, 25, text="Условные обозначения:", font=("Segoe UI", 8, "bold"))
-        self.weld_canvas.create_rectangle(20, 35, 40, 50, fill="#ff8000", outline="#d35400")
-        self.weld_canvas.create_text(50, 45, text="- зона шва", font=("Segoe UI", 8), anchor="w")
-        self.weld_canvas.create_rectangle(20, 55, 40, 70, fill="#bdc3c7", outline="#34495e")
-        self.weld_canvas.create_text(50, 65, text="- основной металл", font=("Segoe UI", 8), anchor="w")
-        self.weld_canvas.create_line(20, 75, 40, 75, fill="#2980b9", width=1.5, dash=(4,2))
-        self.weld_canvas.create_text(50, 78, text="- размерная линия", font=("Segoe UI", 8), anchor="w")
-        
-        # Отрисовка в зависимости от типа
-        if joint in ["C2", "C8"]:
-            self.weld_canvas.create_text(cx, 20, text=f"Тип {joint} - Стыковое V-образное", font=("Segoe UI", 11, "bold"))
-            draw_part(30, cy-35, 180, cy+35)
-            draw_part(340, cy-35, 490, cy+35)
-            self.weld_canvas.create_line(180, cy-35, 210, cy+20, fill="#34495e", width=2)
-            self.weld_canvas.create_line(340, cy-35, 310, cy+20, fill="#34495e", width=2)
-            draw_weld([180, cy-35, 210, cy+20, 310, cy+20, 340, cy-35])
-            if joint == "C8":
-                draw_part(200, cy+25, 320, cy+45, "#95a5a6")
-            self.weld_canvas.create_arc(180, cy-50, 340, cy+10, start=0, extent=180, style="arc", outline="#e74c3c", width=2)
-            draw_dim(210, cy+25, 310, cy+25, "b")
-            draw_dim(170, cy-45, 350, cy-45, "e")
-            draw_dim(490, cy-35, 490, cy+35, "S")
-            draw_dim(260, cy-10, 260, cy-35, "g", 15)
-            self.weld_canvas.create_arc(180, cy-35, 210, cy+20, start=0, extent=45, style="arc", outline="#e74c3c", width=1.5)
-            self.weld_canvas.create_text(170, cy-5, text="α°", font=("Segoe UI", 9, "bold"), fill="#e74c3c")
-            
-        elif joint == "C17":
-            self.weld_canvas.create_text(cx, 20, text="Тип C17 - Стыковое U-образное", font=("Segoe UI", 11, "bold"))
-            draw_part(30, cy-35, 160, cy+35)
-            draw_part(380, cy-35, 490, cy+35)
-            self.weld_canvas.create_arc(160, cy-35, 210, cy+35, start=90, extent=90, style="arc", outline="#34495e", width=2)
-            self.weld_canvas.create_arc(330, cy-35, 380, cy+35, start=0, extent=90, style="arc", outline="#34495e", width=2)
-            draw_weld([160, cy-35, 190, cy-20, 350, cy-20, 380, cy-35, 380, cy+35, 350, cy+20, 190, cy+20, 160, cy+35])
-            draw_dim(190, cy+40, 350, cy+40, "b")
-            draw_dim(145, cy-45, 395, cy-45, "e")
-            draw_dim(490, cy-35, 490, cy+35, "S")
-            draw_dim(160, cy-35, 160, cy-5, "c", -10)
-            draw_dim(380, cy-35, 380, cy-5, "c", -10)
-            
-        elif joint in ["У5", "У7", "У8"]:
-            names = {"У5": "с разделкой", "У7": "без разделки", "У8": "с двумя скосами"}
-            self.weld_canvas.create_text(cx, 20, text=f"Тип {joint} - Угловое {names.get(joint, '')}", font=("Segoe UI", 11, "bold"))
-            draw_part(80, cy+25, 420, cy+65)
-            draw_part(230, cy-60, 270, cy+25)
-            if joint in ["У5", "У8"]:
-                self.weld_canvas.create_line(230, cy+25, 250, cy-20, fill="#34495e", width=2)
-                self.weld_canvas.create_line(270, cy+25, 250, cy-20, fill="#34495e", width=2)
-            if joint == "У8":
-                self.weld_canvas.create_line(230, cy-20, 250, cy-40, fill="#34495e", width=2)
-                self.weld_canvas.create_line(270, cy-20, 250, cy-40, fill="#34495e", width=2)
-            draw_weld([230, cy+25, 250, cy-20, 270, cy+25])
-            draw_weld([230, cy+25, 250, cy+45, 270, cy+25])
-            draw_dim(280, cy-60, 280, cy+25, "S")
-            draw_dim(80, cy+65, 420, cy+65, "S1")
-            draw_dim(250, cy-20, 250, cy+25, "k", -10)
-            draw_dim(250, cy+25, 250, cy+45, "k", -10)
-            
-        elif joint in ["Н1", "Н2"]:
-            name = "одностороннее" if joint == "Н1" else "двустороннее"
-            self.weld_canvas.create_text(cx, 20, text=f"Тип {joint} - Нахлёсточное {name}", font=("Segoe UI", 11, "bold"))
-            draw_part(60, cy-35, 460, cy-5)
-            draw_part(60, cy+5, 460, cy+35)
-            if joint == "Н1":
-                draw_weld([200, cy-5, 240, cy-5, 240, cy+5, 200, cy+5])
-            else:
-                draw_weld([180, cy-5, 210, cy-5, 210, cy+5, 180, cy+5])
-                draw_weld([310, cy-5, 340, cy-5, 340, cy+5, 310, cy+5])
-            draw_dim(240, cy-50, 280, cy-50, "l")
-            draw_dim(60, cy-45, 460, cy-45, "L")
-            
-        elif joint in ["Т1", "Т3"]:
-            name = "без скоса" if joint == "Т1" else "со скосом"
-            self.weld_canvas.create_text(cx, 20, text=f"Тип {joint} - Тавровое {name}", font=("Segoe UI", 11, "bold"))
-            draw_part(60, cy+10, 460, cy+40)
-            draw_part(230, cy-35, 270, cy+10)
-            if joint == "Т3":
-                self.weld_canvas.create_line(230, cy-10, 250, cy-25, fill="#34495e", width=2)
-                self.weld_canvas.create_line(270, cy-10, 250, cy-25, fill="#34495e", width=2)
-            draw_weld([230, cy-10, 270, cy-10, 270, cy+10, 230, cy+10])
-            draw_dim(280, cy-35, 280, cy+10, "S")
-            draw_dim(60, cy+40, 460, cy+40, "L")
-            
-        elif joint == "У4":
-            self.weld_canvas.create_text(cx, 20, text="Тип У4 - Угловое", font=("Segoe UI", 11, "bold"))
-            draw_part(60, cy+10, 350, cy+40)
-            draw_part(280, cy-35, 310, cy+10)
-            draw_weld([280, cy-10, 310, cy-10, 310, cy+10, 280, cy+10])
-            draw_dim(320, cy-35, 320, cy+10, "S")
-            draw_dim(60, cy+40, 350, cy+40, "L")
-        
-        self.weld_canvas.tag_lower("all")
-
-    def update_electrode_marks(self, event=None):
-        """Обновление списка марок электродов"""
-        cat = self.w_el_cat.get()
-        marks = {
-            "Углеродистая сталь": ["УОНИ-13/45", "УОНИ-13/55", "АНО-4", "МР-3", "ОЗС-4", "ОЗС-6"],
-            "Легированная сталь": ["УОНИ-13/85", "АНО-ТМ70", "ЦЛ-18", "ЦЛ-19"],
-            "Теплоустойчивая сталь": ["ЦЛ-6", "ЦУ-2М", "ТМЛ-1", "ТМЛ-3У", "ЦЛ-39"],
-            "Нержавеющая сталь": ["ОЗЛ-6", "ОЗЛ-8", "ЦЛ-11", "ЦТ-15", "КТИ-9А"],
-            "Алюминий": ["ОЗА-1", "ОЗА-2"],
-            "Медь и сплавы": ["КОМСОМОЛЕЦ-100", "АНЦ/ОЗМ-2", "АНЦ/ОЗМ-3"],
-            "Чугун": ["ЦЧ-4", "АНЧ-1", "ОЗЧ-2", "ОЗЧ-6"]
-        }
-        self.w_el_mark['values'] = marks.get(cat, [])
-        if marks.get(cat):
-            self.w_el_mark.set(marks[cat][0])
-        self.update_welding_current()
-
-    def update_welding_current(self, event=None):
-        """Обновление рекомендуемого тока сварки"""
-        mark = self.w_el_mark.get()
-        dia = self.w_el_dia.get()
-        pos = self.w_pos_type.get()
-        
-        current_data = {
-            "УОНИ-13/45": {"2.0": "40-60", "2.5": "50-75", "3.0": "80-100", "4.0": "130-150"},
-            "УОНИ-13/55": {"2.0": "40-60", "2.5": "50-75", "3.0": "80-100", "4.0": "130-160"},
-            "АНО-4": {"3.0": "100-140", "4.0": "170-210"},
-            "МР-3": {"3.0": "140-180", "4.0": "160-200"},
-            "ОЗС-4": {"3.0": "90-100", "4.0": "140-170"},
-            "ОЗС-6": {"3.0": "80-110", "4.0": "170-220"}
-        }
-        
-        current = "130-150 A"
-        if mark in current_data and dia in current_data[mark]:
-            current = current_data[mark][dia]
-        
-        self.out_current.config(state="normal")
-        self.out_current.delete(0, "end")
-        self.out_current.insert(0, f"{current} A")
-        self.out_current.config(state="readonly")
-
-    def calc_weld(self):
-        """Расчет параметров сварного шва"""
-        joint = self.w_joint_type.get()
-        rho = self.get_density()
-        
+    def calc_weld_by_sbornik(self):
+        """Расчет по нормам Сборника 30"""
         try:
-            if joint in ["C2", "C8"]:
-                n = float(self.weld_params["кол-во швов"].get())
-                D = float(self.weld_params["D, мм"].get())
-                S = float(self.weld_params["S, мм"].get())
-                b = float(self.weld_params["b, мм"].get())
-                c = float(self.weld_params["c, мм"].get())
-                g = float(self.weld_params["g, мм"].get())
-                alpha = float(self.weld_params["α°"].get())
+            section = self.weld_section.get()
+            joint = self.weld_joint_type.get()
+            method = self.weld_method.get()
+            rho = self.get_density()
+            
+            # Получение группы электрода
+            mark = self.weld_electrode.get()
+            group, k_el = self.get_electrode_group(mark)
+            
+            # Поправочные коэффициенты для положения шва (из Сборника 30)
+            pos = self.weld_position.get()
+            pos_coeff = {"Нижнее": 1.0, "Вертикальное": 1.12, "Горизонтальное": 1.13, "Потолочное": 1.26}
+            k_pos = pos_coeff.get(pos, 1.0)
+            
+            # Справочные данные по нормам расхода электродов (Сборник 30, Таблицы 002-016)
+            # Нормы на 1 м шва для ручной дуговой сварки (группы электродов I-IV)
+            norms = {
+                "C2": {  # Таблица 002
+                    1: {"I": 0.052, "II": 0.056, "III": 0.059, "IV": 0.063},
+                    2: {"I": 0.108, "II": 0.115, "III": 0.123, "IV": 0.131},
+                    3: {"I": 0.119, "II": 0.127, "III": 0.136, "IV": 0.144},
+                    4: {"I": 0.229, "II": 0.246, "III": 0.262, "IV": 0.278}
+                },
+                "C17": {  # Таблица 006
+                    3: {"I": 0.155, "II": 0.166, "III": 0.177, "IV": 0.188},
+                    4: {"I": 0.196, "II": 0.210, "III": 0.224, "IV": 0.238},
+                    5: {"I": 0.246, "II": 0.264, "III": 0.282, "IV": 0.299},
+                    6: {"I": 0.340, "II": 0.364, "III": 0.389, "IV": 0.413},
+                    8: {"I": 0.494, "II": 0.529, "III": 0.565, "IV": 0.600},
+                    10: {"I": 0.721, "II": 0.772, "III": 0.824, "IV": 0.875},
+                    12: {"I": 0.981, "II": 1.051, "III": 1.121, "IV": 1.191}
+                },
+                "У4": {  # Таблица 009
+                    4: {"I": 0.259, "II": 0.278, "III": 0.296, "IV": 0.315},
+                    5: {"I": 0.361, "II": 0.387, "III": 0.413, "IV": 0.439},
+                    6: {"I": 0.532, "II": 0.570, "III": 0.608, "IV": 0.646},
+                    8: {"I": 0.828, "II": 0.886, "III": 0.946, "IV": 1.005},
+                    10: {"I": 1.186, "II": 1.271, "III": 1.356, "IV": 1.441}
+                },
+                "Т1": {  # Таблица 013
+                    3: {"I": 0.084, "II": 0.090, "III": 0.096, "IV": 0.102},
+                    4: {"I": 0.133, "II": 0.143, "III": 0.152, "IV": 0.161},
+                    6: {"I": 0.266, "II": 0.285, "III": 0.304, "IV": 0.328},
+                    8: {"I": 0.441, "II": 0.472, "III": 0.504, "IV": 0.536},
+                    10: {"I": 0.661, "II": 0.707, "III": 0.755, "IV": 0.802}
+                }
+            }
+            
+            # Определение параметров
+            if "C2" in joint or "С2" in joint:
+                S = float(self.weld_params.get("Толщина деталей S, мм", ttk.Entry()).get())
+                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
+                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
                 
-                e = b + 2 * (S - c) * math.tan(math.radians(alpha)) + 2
-                F = ((b + (e - 2)) / 2) * (S - c) + (b * c) + (2 / 3 * e * g)
-                L = math.pi * (D - S)
-                m = F * L * rho / 1000000 * n
+                # Поиск нормы для заданной толщины
+                norm_data = norms.get("C2", {})
+                s_key = min(norm_data.keys(), key=lambda x: abs(x - S))
+                if s_key in norm_data:
+                    norm = norm_data[s_key].get(["I","II","III","IV"][group-1], 0.1)
+                else:
+                    norm = 0.1
                 
-            elif joint == "C17":
-                n = float(self.weld_params["кол-во швов"].get())
-                D = float(self.weld_params["D, мм"].get())
-                S = float(self.weld_params["S, мм"].get())
-                b = float(self.weld_params["b, мм"].get())
-                c = float(self.weld_params["c, мм"].get())
-                g = float(self.weld_params["g, мм"].get())
-                alpha = float(self.weld_params["α°"].get())
+                # Расчет
+                norm *= k_pos * k_el / 1.6  # Корректировка на группу электрода
+                total = norm * L * n
                 
-                e = b + 2 * (S - c) * math.tan(math.radians(alpha)) + 2
-                F = ((b + (e - 2)) / 2) * (S - c) + (b * c) + (2 / 3 * e * g)
-                L = math.pi * (D - S)
-                m = F * L * rho / 1000000 * n
+                self.display_results(joint, {
+                    "Норма расхода на 1 м шва": f"{norm:.4f}",
+                    "Длина шва": f"{L}",
+                    "Количество швов": f"{int(n)}",
+                    "Общий расход электродов": f"{total:.4f}",
+                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos}"
+                }, "кг")
                 
-            elif joint in ["У5", "У7", "У8"]:
-                n = float(self.weld_params["кол-во швов"].get())
-                D = float(self.weld_params["D, мм"].get())
-                S = float(self.weld_params["S, мм"].get())
-                S1 = float(self.weld_params["S1, мм"].get())
-                b = float(self.weld_params["b, мм"].get())
-                g = float(self.weld_params["g, мм"].get())
+                self.result_text.delete("1.0", tk.END)
+                self.result_text.insert("1.0", 
+                    f"Расчет по Сборнику 30 (Таблица 002)\n"
+                    f"Соединение: {joint}\n"
+                    f"Толщина: {S} мм, Длина шва: {L} м\n"
+                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1]}\n"
+                    f"ИТОГО: {total:.4f} кг электродов\n"
+                )
                 
-                e = S + S1 + b + 1.5
-                K = S + 1
-                K1 = S1 + 1
-                F = (0.5 * K * K1) + (2 / 3 * max(K, K1) * g)
-                L = math.pi * D
-                m = F * L * rho / 1000000 * n
+            elif "C17" in joint or "С17" in joint:
+                S = float(self.weld_params.get("Толщина деталей S, мм", ttk.Entry()).get())
+                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
+                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
                 
-            elif joint in ["Н1", "Н2"]:
-                S = float(self.weld_params["S, мм"].get())
-                L = float(self.weld_params["L, мм"].get())
-                l = float(self.weld_params["l, мм"].get())
-                g = float(self.weld_params["g, мм"].get())
+                norm_data = norms.get("C17", {})
+                s_key = min(norm_data.keys(), key=lambda x: abs(x - S))
+                if s_key in norm_data:
+                    norm = norm_data[s_key].get(["I","II","III","IV"][group-1], 0.2)
+                else:
+                    # Экстраполяция
+                    base_norm = 0.2 * (S / 6) ** 0.8
+                    norm = base_norm
                 
-                e = S + 2
-                F = (0.5 * S * S) + (2 / 3 * e * g)
-                m = F * l * rho / 1000000
-                if joint == "Н2":
-                    m *= 2
-                    
-            elif joint in ["Т1", "Т3"]:
-                S = float(self.weld_params["S, мм"].get())
-                L = float(self.weld_params["L, мм"].get())
-                g = float(self.weld_params["g, мм"].get())
+                norm *= k_pos * k_el / 1.6
+                total = norm * L * n
                 
-                e = S + 2
-                F = (0.5 * S * S) + (2 / 3 * e * g)
-                m = F * L * rho / 1000000
+                self.display_results(joint, {
+                    "Норма расхода на 1 м шва": f"{norm:.4f}",
+                    "Длина шва": f"{L}",
+                    "Количество швов": f"{int(n)}",
+                    "Общий расход электродов": f"{total:.4f}",
+                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos}"
+                }, "кг")
                 
-            elif joint == "У4":
-                S = float(self.weld_params["S, мм"].get())
-                L = float(self.weld_params["L, мм"].get())
-                g = float(self.weld_params["g, мм"].get())
+                self.result_text.delete("1.0", tk.END)
+                self.result_text.insert("1.0", 
+                    f"Расчет по Сборнику 30 (Таблица 006)\n"
+                    f"Соединение: {joint}\n"
+                    f"Толщина: {S} мм, Длина шва: {L} м\n"
+                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1]}\n"
+                    f"ИТОГО: {total:.4f} кг электродов\n"
+                )
                 
-                e = S + 2
-                F = (0.5 * S * S) + (2 / 3 * e * g)
-                m = F * L * rho / 1000000
+            elif "У4" in joint:
+                K = float(self.weld_params.get("Катет шва K, мм", ttk.Entry()).get())
+                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
+                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
+                
+                norm_data = norms.get("У4", {})
+                k_key = min(norm_data.keys(), key=lambda x: abs(x - K))
+                if k_key in norm_data:
+                    norm = norm_data[k_key].get(["I","II","III","IV"][group-1], 0.3)
+                else:
+                    norm = 0.3 * (K / 6) ** 1.2
+                
+                norm *= k_pos * k_el / 1.6
+                total = norm * L * n
+                
+                self.display_results(joint, {
+                    "Норма расхода на 1 м шва": f"{norm:.4f}",
+                    "Длина шва": f"{L}",
+                    "Количество швов": f"{int(n)}",
+                    "Общий расход электродов": f"{total:.4f}",
+                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos}"
+                }, "кг")
+                
+            elif "Т1" in joint:
+                K = float(self.weld_params.get("Катет шва K, мм", ttk.Entry()).get())
+                L = float(self.weld_params.get("Длина шва L, м", ttk.Entry()).get() or 1.0)
+                n = float(self.weld_params.get("Количество швов n", ttk.Entry()).get() or 1)
+                
+                norm_data = norms.get("Т1", {})
+                k_key = min(norm_data.keys(), key=lambda x: abs(x - K))
+                if k_key in norm_data:
+                    norm = norm_data[k_key].get(["I","II","III","IV"][group-1], 0.2)
+                else:
+                    norm = 0.2 * (K / 6) ** 1.3
+                
+                norm *= k_pos * k_el / 1.6
+                total = norm * L * n
+                
+                self.display_results(joint, {
+                    "Норма расхода на 1 м шва": f"{norm:.4f}",
+                    "Длина шва": f"{L}",
+                    "Количество швов": f"{int(n)}",
+                    "Общий расход электродов": f"{total:.4f}",
+                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos}"
+                }, "кг")
+                
+            elif "Раздел II" in section:
+                # Сварка трубопроводов
+                S = float(self.weld_params.get("Толщина стенки S, мм", ttk.Entry()).get())
+                D = float(self.weld_params.get("Диаметр трубы D, мм", ttk.Entry()).get())
+                n = float(self.weld_params.get("Количество стыков", ttk.Entry()).get() or 1)
+                
+                # Расчет длины шва для трубы
+                L_shv = math.pi * (D - S) / 1000  # в метрах
+                
+                # Базовая норма для труб (ориентировочно по Сборнику 30)
+                base_norm = 0.15 * (S / 4) ** 0.7
+                norm = base_norm * k_pos * k_el / 1.6
+                total = norm * L_shv * n
+                
+                self.display_results(joint, {
+                    "Норма на 1 м шва": f"{norm:.4f}",
+                    "Длина шва на стык": f"{L_shv:.3f}",
+                    "Количество стыков": f"{int(n)}",
+                    "Общий расход": f"{total:.4f}",
+                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})",
+                    "Коэффициент положения": f"{k_pos}"
+                }, "кг")
+                
+                self.result_text.delete("1.0", tk.END)
+                self.result_text.insert("1.0", 
+                    f"Расчет по Сборнику 30 (Раздел II)\n"
+                    f"Соединение: {joint}\n"
+                    f"Труба ∅{D}х{S} мм, Длина шва: {L_shv:.3f} м\n"
+                    f"Электрод: {mark}, Группа {['I','II','III','IV'][group-1]}\n"
+                    f"ИТОГО: {total:.4f} кг электродов\n"
+                )
+                
+            elif "Раздел III" in section:
+                # Сварка арматуры
+                d = float(self.weld_params.get("Диаметр стержня d, мм", ttk.Entry()).get())
+                n = float(self.weld_params.get("Количество соединений", ttk.Entry()).get() or 1)
+                
+                # Ориентировочные нормы для арматуры
+                if d <= 10:
+                    norm_one = 0.005
+                elif d <= 16:
+                    norm_one = 0.01
+                elif d <= 22:
+                    norm_one = 0.02
+                elif d <= 28:
+                    norm_one = 0.035
+                elif d <= 36:
+                    norm_one = 0.06
+                else:
+                    norm_one = 0.1
+                
+                norm_one *= k_el / 1.6
+                total = norm_one * n
+                
+                self.display_results(joint, {
+                    "Норма на 1 соединение": f"{norm_one:.4f}",
+                    "Количество соединений": f"{int(n)}",
+                    "Общий расход": f"{total:.4f}",
+                    "Группа электродов": f"{['I','II','III','IV'][group-1]} (K={k_el})"
+                }, "кг")
+                
+                self.result_text.delete("1.0", tk.END)
+                self.result_text.insert("1.0", 
+                    f"Расчет по Сборнику 30 (Раздел III)\n"
+                    f"Соединение: {joint}\n"
+                    f"Диаметр стержня: {d} мм\n"
+                    f"ИТОГО: {total:.4f} кг электродов\n"
+                )
+                
+            elif "Раздел IV" in section:
+                # Газовая резка
+                S = float(self.weld_params.get("Толщина металла S, мм", ttk.Entry()).get())
+                L = float(self.weld_params.get("Длина реза L, м", ttk.Entry()).get() or 1.0)
+                
+                # Ориентировочные нормы расхода газов (Сборник 30, Таблица 094)
+                if S <= 5:
+                    oxygen = 59.4 * L
+                    acetylene = 12.5 * L
+                elif S <= 10:
+                    oxygen = 90.0 * L
+                    acetylene = 18.3 * L
+                elif S <= 20:
+                    oxygen = 180.0 * L
+                    acetylene = 33.6 * L
+                else:
+                    oxygen = 300.0 * L
+                    acetylene = 50.0 * L
+                
+                self.display_results(joint, {
+                    "Расход кислорода": f"{oxygen:.2f}",
+                    "Расход ацетилена": f"{acetylene:.2f}",
+                    "Длина реза": f"{L}",
+                    "Толщина металла": f"{S}"
+                }, "л")
+                
+                self.result_text.delete("1.0", tk.END)
+                self.result_text.insert("1.0", 
+                    f"Расчет по Сборнику 30 (Раздел IV)\n"
+                    f"Резка: {joint}\n"
+                    f"Толщина: {S} мм, Длина: {L} м\n"
+                    f"Кислород: {oxygen:.2f} л, Ацетилен: {acetylene:.2f} л\n"
+                )
             else:
-                messagebox.showerror("Ошибка", "Неизвестный тип соединения")
-                return
-            
-            # Коэффициент расхода электродов
-            mark = self.w_el_mark.get()
-            coeff = {"УОНИ-13/45": 1.60, "УОНИ-13/55": 1.62, "АНО-4": 1.70, "МР-3": 1.70, "ОЗС-4": 1.60, "ОЗС-6": 1.50}
-            k = coeff.get(mark, 1.62)
-            
-            self.out_e.config(state="normal")
-            self.out_e.delete(0, "end")
-            self.out_e.insert(0, f"{e:.1f}")
-            self.out_e.config(state="readonly")
-            
-            self.out_el_mass.config(state="normal")
-            self.out_el_mass.delete(0, "end")
-            self.out_el_mass.insert(0, f"{m * k:.3f}")
-            self.out_el_mass.config(state="readonly")
-            
+                messagebox.showinfo("Информация", "Для данного типа соединения расчет выполняется по общим формулам")
+                self.result_text.delete("1.0", tk.END)
+                self.result_text.insert("1.0", "Для данного соединения используйте ручной расчет по Сборнику 30")
+                
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Проверьте введенные данные!\n{str(e)}")
+            messagebox.showerror("Ошибка", f"Ошибка при расчете: {str(e)}")
+            self.result_text.delete("1.0", tk.END)
+            self.result_text.insert("1.0", f"Ошибка: {str(e)}")
+
+    def display_results(self, joint, params, unit):
+        """Отображение результатов в таблице"""
+        for item in self.result_tree.get_children():
+            self.result_tree.delete(item)
+        
+        for param, value in params.items():
+            self.result_tree.insert("", "end", values=(param, value, unit))
 
     # ==================== ВКЛАДКА 6: СПРАВОЧНИК ЭЛЕКТРОДОВ ====================
     def init_electrodes_tab(self):
