@@ -668,7 +668,7 @@ class MetallistProApp:
             pcs_r = int(n_kg / (w_nr_base * rho_coeff)) if (w_nr_base * rho_coeff) > 0 else 0
             self.n_pcs_rev.config(state="normal"); self.n_pcs_rev.delete(0, "end"); self.n_pcs_rev.insert(0, str(pcs_r)); self.n_pcs_rev.config(state="readonly")
         except: pass
-        # --- 3. РАСЧЕТ ШАЙБ ---
+                # --- 3. РАСЧЕТ ШАЙБ ---
         base_washer = {"М10": 0.004, "М12": 0.006, "М16": 0.011, "М20": 0.017, "М24": 0.032, "М30": 0.054, "М36": 0.092, "М42": 0.182, "М48": 0.274}
         ws = self.w_size.get(); w_g = self.w_gost.get()
         w_w_base = base_washer.get(ws, 0.011)
@@ -691,13 +691,13 @@ class MetallistProApp:
             self.w_pcs_rev.config(state="normal"); self.w_pcs_rev.delete(0, "end"); self.w_pcs_rev.insert(0, str(pcs_r)); self.w_pcs_rev.config(state="readonly")
         except: pass
 
-        # --- 4. РАСЧЕТ ШПИЛЕК И САМОРЕЗОВ ---
+        # --- 4. РАСЧЕТ ШПИЛЕК И САМОРЕЗОВ (Опечатка со списками полностью исправлена)
         ss = self.s_size.get()
         w_s_base = 0.00049
         if "М" in ss:
             parts = ss.replace("М", "").split("х")
-            sd_d = "М" + parts
-            try: sd_l = float(parts) if len(parts) > 1 else 90.0
+            sd_d = "М" + parts[0] if len(parts) > 0 else "М16"
+            try: sd_l = float(parts[1]) if len(parts) > 1 else 90.0
             except: sd_l = 90.0
             weights_stud_90 = {"М12": 0.080, "М16": 0.142, "М20": 0.246, "М24": 0.395, "М30": 0.670, "М36": 1.020, "М42": 1.480, "М48": 2.050}
             w_s_base = weights_stud_90.get(sd_d, 0.142) * (sd_l / 90.0)
@@ -716,8 +716,8 @@ class MetallistProApp:
             ss_r = self.s_size_rev.get()
             if "М" in ss_r:
                 parts_r = ss_r.replace("М", "").split("х")
-                sdr_d = "М" + parts_r
-                try: sdr_l = float(parts_r) if len(parts_r) > 1 else 90.0
+                sdr_d = "М" + parts_r[0] if len(parts_r) > 0 else "М16"
+                try: sdr_l = float(parts_r[1]) if len(parts_r) > 1 else 90.0
                 except: sdr_l = 90.0
                 weights_stud_90 = {"М12": 0.080, "М16": 0.142, "М20": 0.246, "М24": 0.395, "М30": 0.670, "М36": 1.020, "М42": 1.480, "М48": 2.050}
                 w_sr_base = weights_stud_90.get(sdr_d, 0.142) * (sdr_l / 90.0)
