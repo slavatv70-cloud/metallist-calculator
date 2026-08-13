@@ -61,7 +61,7 @@ class MetallistProApp:
         footer = tk.Frame(self.root, bg="#2c3e50", height=32)
         footer.pack(fill="x", side="bottom", pady=(5, 0))
         footer_text = "Разработчик Тищенко Вячеслав Владимирович, сметная группа г.Назарово ООО \"СГК\" 2026г. версия 2"
-        lbl_footer = tk.Label(footer, text=footer_text, fg="#ff8c00", bg="#2c3e50", font=("Segoe UI", 11, "bold"))
+        lbl_footer = tk.Label(footer, text=footer_text, foreground="#ff8c00", background="#2c3e50", font=("Segoe UI", 11, "bold"))
         lbl_footer.pack(pady=4)
 
     def toggle_interface_theme(self):
@@ -117,7 +117,7 @@ class MetallistProApp:
         right = ttk.LabelFrame(tab, text=" Результаты ")
         right.pack(side="right", fill="both", expand=True, padx=15, pady=15)
         
-        self.geom_result = tk.Text(right, bg="#ffffff", fg="#333333", font=("Consolas", 11), bd=1, relief="solid")
+        self.geom_result = tk.Text(right, bg="#ffffff", foreground="#333333", font=("Consolas", 11), bd=1, relief="solid")
         self.geom_result.pack(fill="both", expand=True, padx=8, pady=8)
         self.update_geom_inputs()
 
@@ -243,7 +243,7 @@ class MetallistProApp:
         self.sort_tree.column("weight", width=200, anchor="center")
         self.sort_tree.pack(fill="x", padx=15, pady=5)
         
-        self.sort_output = tk.Text(tab, bg="#ffffff", font=("Consolas", 10), height=8, bd=1, relief="solid")
+        self.sort_output = tk.Text(tab, bg="#ffffff", foreground="#000000", font=("Consolas", 10), height=8, bd=1, relief="solid")
         self.sort_output.pack(fill="both", expand=True, padx=15, pady=10)
         self.on_sortament_profile_change()
 
@@ -407,7 +407,7 @@ class MetallistProApp:
         
         ttk.Button(left, text="Посчитать точную массу по ГОСТ/ТУ", command=self.proc_detali_calc).pack(fill="x", padx=10, pady=10)
         
-        self.det_output = tk.Text(tab, bg="#ffffff", font=("Consolas", 10), bd=1, relief="solid")
+        self.det_output = tk.Text(tab, bg="#ffffff", foreground="#000000", font=("Consolas", 10), bd=1, relief="solid")
         self.det_output.pack(side="right", fill="both", expand=True, padx=15, pady=15)
         self.toggle_detali_widgets_view()
 
@@ -1325,12 +1325,12 @@ class MetallistProApp:
         
         all_frame = ttk.LabelFrame(right_frame, text=" Все марки в группе ")
         all_frame.pack(fill="x", pady=5)
-        self.el_all_text = tk.Text(all_frame, height=2, font=("Consolas", 10))
+        self.el_all_text = tk.Text(all_frame, bg="#ffffff", foreground="#000000", height=2, font=("Consolas", 10))
         self.el_all_text.pack(fill="x", padx=5, pady=5)
         
         desc_frame = ttk.LabelFrame(right_frame, text=" Описание ")
         desc_frame.pack(fill="both", expand=True, pady=5)
-        self.el_desc_text = tk.Text(desc_frame, bg="#f8f9fa", font=("Segoe UI", 10))
+        self.el_desc_text = tk.Text(desc_frame, bg="#f8f9fa", foreground="#000000", font=("Segoe UI", 10))
         self.el_desc_text.pack(fill="both", expand=True, padx=5, pady=5)
         
         self.el_cat_list.bind("<<ListboxSelect>>", self.on_electrode_category_change)
@@ -1381,7 +1381,7 @@ class MetallistProApp:
         self.notebook.add(tab, text="📝 Обозначение швов (ГОСТ)")
         
         ttk.Label(tab, text="Структура условного обозначения сварного шва по ГОСТ 2.312-72", 
-                 font=("Segoe UI", 11, "bold"), fg="#8e44ad").pack(pady=10, anchor="w", padx=20)
+                 font=("Segoe UI", 11, "bold"), foreground="#8e44ad").pack(pady=10, anchor="w", padx=20)
         
         # Схема расположения знаков
         arrow_frame = ttk.LabelFrame(tab, text=" Схема расположения знаков ")
@@ -1431,7 +1431,7 @@ class MetallistProApp:
         for g in gost_data:
             self.gost_list.insert("end", g)
         
-        self.gost_desc = tk.Text(gost_frame, bg="#f8f9fa", font=("Segoe UI", 10), width=45)
+        self.gost_desc = tk.Text(gost_frame, bg="#f8f9fa", foreground="#000000", font=("Segoe UI", 10), width=45)
         self.gost_desc.pack(side="right", fill="both", expand=True, padx=5, pady=5)
         
         self.gost_list.bind("<<ListboxSelect>>", self.update_gost_info)
@@ -1477,7 +1477,7 @@ class MetallistProApp:
         btn_frame.grid(row=2, column=0, columnspan=2, pady=10)
         ttk.Button(btn_frame, text="Рассчитать объем изоляции", command=self.calc_insulation, width=40).pack()
         
-        self.iso_output = tk.Text(tab, bg="#ffffff", font=("Courier", 10), height=12, bd=1, relief="solid")
+        self.iso_output = tk.Text(tab, bg="#ffffff", foreground="#000000", font=("Courier", 10), height=12, bd=1, relief="solid")
         self.iso_output.pack(fill="both", expand=True, padx=15, pady=10)
         self.update_iso_inputs()
 
