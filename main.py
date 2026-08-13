@@ -191,11 +191,16 @@ class MetallistProApp:
         rho = self.get_density(); prof = self.sort_profile.get()
         sel = self.sort_tree.focus()
         if not sel: messagebox.showwarning("Внимание", "Выберите строку сортамента в таблице!"); return
-        val = self.sort_tree.item(sel, "values")
-        try: L = float(self.sort_length.get())
-        except: L = 12.0
-        total = float(val) * (rho / 7.85) * L
-        res = f"📊 РЕЗУЛЬТАТ РАСЧЕТА СОРТАМЕНТА:\n• Профиль: {prof} ({val})\n• Расчетная длина: {L} м\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС ПАРТИИ: {total:.3f} кг\n"
+        # Исправлено: Четкое извлечение веса из второй колонки Treeview
+        item_data = self.sort_tree.item(sel)
+        val = item_data["values"]
+        try:
+            w_meter = float(val[1])
+            L = float(self.sort_length.get())
+        except:
+            w_meter = 0.0; L = 12.0
+        total = w_meter * (rho / 7.85) * L
+        res = f"📊 РЕЗУЛЬТАТ РАСЧЕТА СОРТАМЕНТА:\n• Профиль: {prof} ({val[0]})\n• Вес 1м (базовый): {w_meter} кг\n• Расчетная длина: {L} м\n▶ ИТОГОВЫЙ СМЕТНЫЙ ВЕС ПАРТИИ: {total:.3f} кг\n"
         self.sort_output.delete("1.0", tk.END); self.sort_output.insert("1.0", res)
     def init_detali_tab(self):
         tab = ttk.Frame(self.notebook)
@@ -227,13 +232,17 @@ class MetallistProApp:
         t, d = self.det_type.get(), self.det_dy.get()
         try: c = float(self.det_cnt.get())
         except: c = 1.0
+        
         w_map = {
             "Ду50": 0.7, "Ду80": 2.1, "Ду100": 3.3, "Ду150": 8.1, "Ду200": 17.2, "Ду250": 33.5, 
             "Ду300": 51.4, "Ду400": 98.6, "Ду500": 173.0, "Ду600": 248.0, "Ду700": 345.0, 
             "Ду800": 482.0, "Ду900": 634.0, "Ду1000": 810.0
         }
-        prefix = d.split(" ")
-        w = w_map.get(prefix, 8.1)
+        
+        # Исправлено: Корректное выделение ключа типа "Ду150" из строки "Ду150 (∅159)"
+        clean_key = d.split("(")[0].strip()
+        w = w_map.get(clean_key, 8.1)
+        
         total = w * c * (self.get_density() / 7.85)
         self.det_output.delete("1.0", "end")
         self.det_output.insert("1.0", f"🔧 ВЕДОМОСТЬ ФАСОННЫХ ЭЛЕМЕНТОВ СГК:\n• Элемент: {t}\n• Типоразмер: {d}\n• Паспортная масса 1 ед.: {w:.2f} кг\n• Количество: {int(c)} шт\n----------------------------------------\n▶ ИТОГОВАЯ МАССА ПАРТИИ: {total:.2f} кг\n")
@@ -241,7 +250,7 @@ class MetallistProApp:
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="🔩 Метизы")
         
-        # Задаем жесткую двухрядную сетку интерфейса
+        # Жесткая двухрядная сетка интерфейса (2 строки на 2 колонки)
         tab.grid_rowconfigure(0, weight=1)
         tab.grid_rowconfigure(1, weight=1)
         tab.grid_columnconfigure(0, weight=1)
@@ -253,7 +262,6 @@ class MetallistProApp:
         f1 = ttk.LabelFrame(tab, text=" БОЛТЫ ЭНЕРГЕТИЧЕСКИЕ ")
         f1.grid(row=0, column=0, padx=10, pady=8, sticky="nsew")
         
-        # Разметка внутренней сетки только через grid
         f1.grid_columnconfigure(0, weight=1)
         
         self.b_gost = ttk.Combobox(f1, values=["ГОСТ 7798-70 шестигранные", "ГОСТ R 52644-2006 высокопрочные", "ГОСТ 10602-94 крупные (от М42)"], state="readonly")
@@ -531,7 +539,8 @@ class MetallistProApp:
         if "М" in ss:
             parts = ss.replace("М", "").split("х")
             sd_d = "М" + parts[0]
-            sd_l = float(parts[1]) if len(parts) > 1 else 90.0
+            try: sd_l = float(parts[1]) if len(parts) > 1 else 90.0
+            except: sd_l = 90.0
             weights_stud_90 = {"М12": 0.080, "М16": 0.142, "М20": 0.246, "М24": 0.395, "М30": 0.670, "М36": 1.020, "М42": 1.480, "М48": 2.050}
             w_s_base = weights_stud_90.get(sd_d, 0.142) * (sd_l / 90.0)
         else:
@@ -550,7 +559,8 @@ class MetallistProApp:
             if "М" in ss_r:
                 parts_r = ss_r.replace("М", "").split("х")
                 sdr_d = "М" + parts_r[0]
-                sdr_l = float(parts_r[1]) if len(parts_r) > 1 else 90.0
+                try: sdr_l = float(parts_r[1]) if len(parts_r) > 1 else 90.0
+                except: sdr_l = 90.0
                 weights_stud_90 = {"М12": 0.080, "М16": 0.142, "М20": 0.246, "М24": 0.395, "М30": 0.670, "М36": 1.020, "М42": 1.480, "М48": 2.050}
                 w_sr_base = weights_stud_90.get(sdr_d, 0.142) * (sdr_l / 90.0)
             else:
@@ -699,22 +709,31 @@ class MetallistProApp:
             self.w_inputs[lbl] = e
         self.redraw_gost_canvas_shapes()
     def redraw_gost_canvas_shapes(self):
-        self.w_canvas.delete("all"); joint = self.w_joint_type.get(); cx, cy = 220, 110
+        self.w_canvas.delete("all")
+        joint = self.w_joint_type.get()
+        cx, cy = 220, 110
+        
         def draw_arrow(x1, y1, x2, y2, label="", txt_x=0, txt_y=0):
             self.w_canvas.create_line(x1, y1, x2, y2, fill="#130f40", width=1, arrow="both", arrowshape=(8,10,3))
             if label: self.w_canvas.create_text(txt_x if txt_x else (x1+x2)/2, txt_y if txt_y else (y1+y2)/2-10, text=label, font=("Segoe UI", 9, "bold"), fill="#2c3e50")
+
         if joint in ["C2", "C8"]:
             self.w_canvas.create_rectangle(40, cy-15, 185, cy+15, fill="#dcdde1", outline="#7f8c8d", width=1.5)
             self.w_canvas.create_rectangle(235, cy-15, 380, cy+15, fill="#dcdde1", outline="#7f8c8d", width=1.5)
             self.w_canvas.create_oval(175, cy-22, 245, cy+12, fill="#ff8000", outline="#d35400", width=1.5)
-            draw_arrow(185, cy+28, 235, cy+28, "b"); draw_arrow(175, cy-32, 245, cy-32, "e")
-            draw_arrow(210, cy-22, 210, cy-15, "g", txt_x=225, txt_y=cy-25); draw_arrow(390, cy-15, 390, cy+15, "S", txt_x=405)
-            self.w_canvas.create_line(40, cy, 380, cy, fill="#7f8c8d", dash=(6,4)); draw_arrow(50, cy-50, 50, cy, "D", txt_x=65, txt_y=cy-25)
+            draw_arrow(185, cy+28, 235, cy+28, "b")
+            draw_arrow(175, cy-32, 245, cy-32, "e")
+            draw_arrow(210, cy-22, 210, cy-15, "g", txt_x=225, txt_y=cy-25)
+            draw_arrow(390, cy-15, 390, cy+15, "S", txt_x=405)
+            self.w_canvas.create_line(40, cy, 380, cy, fill="#7f8c8d", dash=(6,4))
+            draw_arrow(50, cy-50, 50, cy, "D", txt_x=65, txt_y=cy-25)
         elif joint == "C17":
             self.w_canvas.create_polygon(40,cy-20, 150,cy-20, 180,cy+20, 40,cy+20, fill="#dcdde1", outline="#7f8c8d", width=1.5)
             self.w_canvas.create_polygon(380,cy-20, 270,cy-20, 240,cy+20, 380,cy+20, fill="#dcdde1", outline="#7f8c8d", width=1.5)
             self.w_canvas.create_oval(165, cy-28, 255, cy+15, fill="#ff8000", outline="#d35400", width=1.5)
-            draw_arrow(180, cy+32, 240, cy+32, "b"); draw_arrow(165, cy-38, 255, cy-38, "e"); draw_arrow(390, cy-20, 390, cy+20, "S", txt_x=405)
+            draw_arrow(180, cy+32, 240, cy+32, "b")
+            draw_arrow(165, cy-38, 255, cy-38, "e")
+            draw_arrow(390, cy-20, 390, cy+20, "S", txt_x=405)
             self.w_canvas.create_arc(130, cy-35, 190, cy+5, start=315, extent=45, style="arc", outline="red", width=1.5)
             self.w_canvas.create_text(135, cy-10, text="A°", font=("Segoe UI", 9, "bold"), fill="red")
         elif joint in ["У5", "У7", "У8"]:
@@ -722,7 +741,8 @@ class MetallistProApp:
             self.w_canvas.create_rectangle(60, cy-20, 210, cy+20, fill="#dcdde1", outline="#7f8c8d", width=1.5)
             self.w_canvas.create_polygon(210,cy-20, 210,cy-50, 175,cy-20, fill="#ff8000", outline="#d35400", width=1.5)
             self.w_canvas.create_polygon(210,cy+20, 210,cy+50, 175,cy+20, fill="#ff8000", outline="#d35400", width=1.5)
-            draw_arrow(335, cy-70, 335, cy+70, "S1", txt_x=355); draw_arrow(45, cy-20, 45, cy+20, "S", txt_x=30)
+            draw_arrow(335, cy-70, 335, cy+70, "S1", txt_x=355)
+            draw_arrow(45, cy-20, 45, cy+20, "S", txt_x=30)
         else:
             self.w_canvas.create_rectangle(60, cy-25, 240, cy, fill="#dcdde1", outline="#7f8c8d", width=1.5)
             self.w_canvas.create_rectangle(150, cy, 340, cy+25, fill="#b2bec3", outline="#7f8c8d", width=1.5)
@@ -733,29 +753,53 @@ class MetallistProApp:
         self.out_e.delete(0, "end"); self.out_el_mass.delete(0, "end")
         try:
             if joint in ["C2", "C8"]:
-                n = float(self.w_inputs["кол-во св. швов"].get()); D = float(self.w_inputs["диаметр трубы (D), мм"].get()); S = float(self.w_inputs["толщина стенки (S), мм"].get()); b = float(self.w_inputs["зазор после прихватки (b), мм"].get()); g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                n = float(self.w_inputs["кол-во св. швов"].get())
+                D = float(self.w_inputs["диаметр трубы (D), мм"].get())
+                S = float(self.w_inputs["толщина стенки (S), мм"].get())
+                b = float(self.w_inputs["зазор после прихватки (b), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
                 c = float(self.w_inputs["притупление кромки (c), мм"].get()) if "притупление кромки (c), мм" in self.w_inputs else 0.5
                 A = float(self.w_inputs["угол фаски (A°)"].get()) if "угол фаски (A°)" in self.w_inputs else 50.0
                 e = b + 2 * (S - c) * math.tan(math.radians(A)) + 2
                 F_w = ((b + (e - 2)) / 2) * (S - c) + (b * c) + (2 / 3 * e * g)
                 L_w = math.pi * (D - S); m_dep = (F_w * L_w * rho / 1000000) * n
             elif joint == "C17":
-                n = float(self.w_inputs["кол-во св. швов"].get()); D = float(self.w_inputs["диаметр трубы (D), мм"].get()); S = float(self.w_inputs["толщина стенки (S), мм"].get()); b = float(self.w_inputs["зазор после прихватки (b), мм"].get()); c = float(self.w_inputs["притупление кромки (c), мм"].get()); g = float(self.w_inputs["выпуклость шва (g), мм"].get()); A = float(self.w_inputs["угол фаски (A°)"].get())
-                e = b + 2 * (S - c) * math.tan(math.radians(A)) + 2; F_w = ((b + (e - 2)) / 2) * (S - c) + (b * c) + (2 / 3 * e * g)
+                n = float(self.w_inputs["кол-во св. швов"].get())
+                D = float(self.w_inputs["диаметр трубы (D), мм"].get())
+                S = float(self.w_inputs["толщина стенки (S), мм"].get())
+                b = float(self.w_inputs["зазор после прихватки (b), мм"].get())
+                c = float(self.w_inputs["притупление кромки (c), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                A = float(self.w_inputs["угол фаски (A°)"].get())
+                e = b + 2 * (S - c) * math.tan(math.radians(A)) + 2
+                F_w = ((b + (e - 2)) / 2) * (S - c) + (b * c) + (2 / 3 * e * g)
                 L_w = math.pi * (D - S); m_dep = (F_w * L_w * rho / 1000000) * n
             elif joint in ["У5", "У7", "У8"]:
-                n = float(self.w_inputs["кол-во св. швов"].get()); D = float(self.w_inputs["диаметр трубы (D), мм"].get()); S = float(self.w_inputs["толщина стенки (S), мм"].get()); S1 = float(self.w_inputs["толщина фланца (S1), мм"].get()); b = float(self.w_inputs["зазор после прихватки (b), мм"].get()); g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                n = float(self.w_inputs["кол-во св. швов"].get())
+                D = float(self.w_inputs["диаметр трубы (D), мм"].get())
+                S = float(self.w_inputs["толщина стенки (S), мм"].get())
+                S1 = float(self.w_inputs["толщина фланца (S1), мм"].get())
+                b = float(self.w_inputs["зазор после прихватки (b), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
                 e = S + S1 + b + 1.5; K = S + 1; K1 = S1 + 1; F_w = (0.5 * K * K1) + (2 / 3 * max(K, K1) * g)
                 L_w = math.pi * D; m_dep = (F_w * L_w * rho / 1000000) * n
             else:
-                S = float(self.w_inputs["толщина листа (S), мм"].get()); L_w = float(self.w_inputs["Длина шва, мм"].get()); k = float(self.w_inputs["Катет шва (k), мм"].get()); g = float(self.w_inputs["выпуклость шва (g), мм"].get())
+                S = float(self.w_inputs["толщина листа (S), мм"].get())
+                L_w = float(self.w_inputs["Длина шва, мм"].get())
+                k = float(self.w_inputs["Катет шва (k), мм"].get())
+                g = float(self.w_inputs["выпуклость шва (g), мм"].get())
                 e = k + 2; F_w = (0.5 * k * k) + (2 / 3 * e * g); m_dep = (F_w * L_w * rho / 1000000)
-            mark = self.w_el_mark.get(); rate_coeff = 1.62
+            
+            mark = self.w_el_mark.get()
+            rate_coeff = 1.62
             if mark in ["УОНИ-13/45", "ОЗС-4"]: rate_coeff = 1.60
             elif mark in ["МР-3", "АНО-4"]: rate_coeff = 1.70
             elif mark == "ОЗС-6": rate_coeff = 1.50
-            self.out_e.insert(0, f"{round(e, 1)}"); self.out_el_mass.insert(0, f"{m_dep * rate_coeff:.3f}")
-        except Exception: messagebox.showerror("Ошибка", "Проверить параметры!")
+            
+            self.out_e.insert(0, f"{round(e, 1)}")
+            self.out_el_mass.insert(0, f"{m_dep * rate_coeff:.3f}")
+        except Exception: 
+            messagebox.showerror("Ошибка", "Проверить числовые параметры!")
     def init_electrodes_tab(self):
         tab = ttk.Frame(self.notebook); self.notebook.add(tab, text="📖 Справочник электродов")
         ttk.Label(tab, text="Выбор марки электрода в зависимости от свариваемого материала конструкции", font=("Segoe UI", 11, "bold")).pack(pady=8, anchor="w", padx=15)
@@ -806,7 +850,7 @@ class MetallistProApp:
         tk.Label(tab, text="Структура условного обозначения стандартного сварного шва по ГОСТ 2.312-72", font=("Segoe UI", 11, "bold"), fg="#8e44ad").pack(pady=10, anchor="w", padx=20)
         f_arrow = ttk.LabelFrame(tab, text=" 📊 Схема расположения знаков на линии выноски чертежа "); f_arrow.pack(fill="x", padx=20, pady=5)
         f_fields = ttk.Frame(f_arrow); f_fields.pack(pady=10)
-        fields_desc = ["1. Стандарт", "2. Тип соединения", "3. Способ сварки", "4. Катет шва", "5. Особая длина", "6. Вспом. знаки"]
+        fields_desc = ["1. Standard", "2. Тип соединения", "3. Способ сварки", "4. Катет шва", "5. Особая длина", "6. Вспом. знаки"]
         for i, f_lbl in enumerate(fields_desc):
             ttk.Label(f_fields, text=f" {f_lbl} ", font=("Segoe UI", 9, "bold")).pack(side="left", padx=5)
             e = ttk.Entry(f_fields, width=10, justify="center"); e.insert(0, f"[{i+1}]"); e.pack(side="left", padx=2)
