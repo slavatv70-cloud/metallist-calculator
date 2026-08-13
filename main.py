@@ -320,16 +320,16 @@ class MetallistProApp:
         self.det_angle = ttk.Combobox(self.f_det_angle, values=["30", "45", "90"], state="readonly", width=8)
         self.det_angle.set("90"); self.det_angle.pack(side="left", padx=10)
         
-        # Желтая панель ручного САПР-ввода геометрических параметров
+        # Желтая панель ручного САПР-ввода параметров (Все приставки self. добавлены строго на свои места)
         self.man_det_frame = ttk.LabelFrame(left, text=" Ручной ввод геометрических параметров заготовки ")
         self.man_det_frame.pack(fill="x", padx=10, pady=6)
         
         ttk.Label(self.man_det_frame, text="Внешний диаметр D, мм:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.det_manual_d = tk.Entry(man_det_frame, width=10, bg="#fff2cc", justify="center")
+        self.det_manual_d = tk.Entry(self.man_det_frame, width=10, bg="#fff2cc", justify="center")
         self.det_manual_d.insert(0, "159"); self.det_manual_d.grid(row=0, column=1, padx=5, pady=5)
         
         ttk.Label(self.man_det_frame, text="Толщина стенки s, мм:").grid(row=0, column=2, padx=10, pady=5, sticky="w")
-        self.det_manual_s = tk.Entry(man_det_frame, width=10, bg="#fff2cc", justify="center")
+        self.det_manual_s = tk.Entry(self.man_det_frame, width=10, bg="#fff2cc", justify="center")
         self.det_manual_s.insert(0, "5"); self.det_manual_s.grid(row=0, column=3, padx=5, pady=5)
         
         # Специальное поле для воротниковых фланцев
