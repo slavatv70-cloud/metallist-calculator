@@ -295,64 +295,57 @@ class MetallistProApp:
             
         self.sort_output.delete("1.0", tk.END)
         self.sort_output.insert("1.0", res)
-    def proc_detali_calc(self):
-        t = self.det_type.get()
-        rho = self.get_density()
-        try: c = float(self.det_cnt.get())
-        except: c = 1.0
+        def init_detali_tab(self):
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text="🔧 Детали трубопроводов")
+        left = ttk.LabelFrame(tab, text=" Параметры арматуры и отводов ")
+        left.pack(side="left", fill="both", expand=True, padx=15, pady=15)
         
-        if "Фланец" in t:
-            f_dy = self.det_flange_dy.get()
-            w_flanges = {"Ду50": 2.4, "Ду80": 3.6, "Ду100": 4.7, "Ду150": 6.8, "Ду200": 10.5, "Ду250": 14.8, "Ду300": 19.3, "Ду400": 28.5, "Ду500": 38.2, "Ду600": 54.0, "Ду800": 86.0, "Ду1000": 124.0}
-            w_unit = w_flanges.get(f_dy, 6.8) * (rho / 7.85)
-            desc_str = f"ГОСТ 33259-2015 магистральный ({f_dy})"
-        else:
-            try:
-                D = float(self.det_manual_d.get().strip())
-                s = float(self.det_manual_s.get().strip())
-                angle_val = float(self.det_angle.get())
-            except:
-                messagebox.showerror("Ошибка", "Проверить числовой ввод Диаметра и Стенки отвода!"); return
-                
-            # База данных эталонных масс отводов СГК на 90 градусов по ГОСТ 17375 / 30753
-            # Ключ: (Диаметр, Стенка, Тип ГОСТ) -> Масса отвода 90° в кг
-            gost_weights_90 = {
-                # ГОСТ 17375-2001 (Тип 3D)
-                (57.0, 3.5, "17375"): 0.7, (89.0, 4.0, "17375"): 2.1, (108.0, 4.0, "17375"): 3.3,
-                (159.0, 5.0, "17375"): 8.1, (219.0, 6.0, "17375"): 17.2, (273.0, 7.0, "17375"): 33.5,
-                (325.0, 8.0, "17375"): 51.4, (426.0, 9.0, "17375"): 98.6, (530.0, 10.0, "17375"): 173.0,
-                # ГОСТ 30753-2001 (Тип 2D)
-                (57.0, 3.5, "30753"): 0.5, (89.0, 4.0, "30753"): 1.4, (108.0, 4.0, "30753"): 2.1,
-                (159.0, 5.0, "30753"): 5.3, (219.0, 6.0, "30753"): 11.4, (273.0, 7.0, "30753"): 21.6,
-                (325.0, 8.0, "30753"): 33.1, (426.0, 9.0, "30753"): 63.8, (530.0, 10.0, "30753"): 111.0
-            }
-            
-            gost_key = "17375" if "17375" in t else "30753" if "30753" in t else "TU"
-            
-            # Если размер стандартный — берем чистый табличный вес ГОСТ и пропорционально делим на угол
-            if (D, s, gost_key) in gost_weights_90:
-                base_w_90 = gost_weights_90[(D, s, gost_key)]
-                w_unit = (base_w_90 / 90.0) * angle_val * (rho / 7.85)
-                st_name = "ГОСТ 17375" if gost_key == "17375" else "ГОСТ 30753"
-                desc_str = f"Табличный {st_name} (СГК-База), угол {int(angle_val)}°, ∅{D}х{s} мм"
-            else:
-                # Если введен редкий/нестандартный размер — включается безошибочный САПР-расчет тора в дециметрах
-                if "17375" in t: R_bend = 1.5 * D
-                elif "30753" in t: R_bend = 1.0 * D
-                elif "51-515" in t: R_bend = 1.375 * D
-                else: R_bend = 15000.0 # Магистральный гнутый ГОСТ 24950-81
-                
-                # Объем металла в куб. мм переводим в куб. дм (делитель 1 000 000), чтобы увязать с плотностью г/см3
-                V_metal_dm3 = ((angle_val / 360.0) * (2.0 * (math.pi ** 2) * R_bend * ((D - s) / 2.0) * s)) / 1000000.0
-                if "51-515" in t: V_metal_dm3 *= 1.06 # Коэффициент утолщения стенки ТУ
-                
-                w_unit = V_metal_dm3 * rho
-                st_name = "ГОСТ 24950" if "24950" in t else "ТУ 51-515" if "51-515" in t else "Нестандартный ГОСТ"
-                desc_str = f"Геометрический САПР-расчет ({st_name}), угол {int(angle_val)}°, ∅{D}х{s} мм"
-            
-        total = w_unit * c
-        self.det_output.delete("1.0", "end")
-        self.det_output.insert("1.0", f"🔧 ВЕДОМОСТЬ ФАСОННЫХ ЭЛЕМЕНТОВ И ОТВОДОВ СГК:\n• Тип изделия по проекту: {t}\n• Нормативная спецификация: {desc_str}\n• Плотность материала сессии: {rho:.2f} г/см³\n• Расчетная масса 1 штуки: {w_unit:.3f} кг\n• Количество в спецификации: {int(c)} шт\n------------------------------------------------------------\n▶ ИТОГОВАЯ СМЕТНАЯ МАССА ПАРТИИ ДЕТАЛЕЙ: {total:.2f} кг\n")
+        ttk.Label(left, text="Тип стандарта / Спецификация:").pack(anchor="w", padx=10, pady=2)
+        self.det_type = ttk.Combobox(left, values=[
+            "Отвод ГОСТ 17375-2001 (Тип 3D, R≈1.5DN)", 
+            "Отвод ГОСТ 30753-2001 (Тип 2D, R≈1.0DN)", 
+            "Отвод ТУ 51-515-91 (Промысловый хладостойкий)", 
+            "Отвод ГОСТ 24950-81 (Магистральный гнутый R=15-60м)",
+            "Фланец ГОСТ 33259-2015 (Плоский/Воротниковый)"
+        ], state="readonly", width=42)
+        self.det_type.set("Отвод ГОСТ 17375-2001 (Тип 3D, R≈1.5DN)")
+        self.det_type.pack(fill="x", padx=10, pady=4)
+        self.det_type.bind("<<ComboboxSelected>>", self.toggle_detali_widgets_view)
+        
+        # Панель выбора угла для отводов
+        self.f_det_angle = ttk.Frame(left)
+        self.f_det_angle.pack(fill="x", padx=10, pady=4)
+        ttk.Label(self.f_det_angle, text="Угол изгиба оси отвода, град:").pack(side="left")
+        self.det_angle = ttk.Combobox(self.f_det_angle, values=["30", "45", "90"], state="readonly", width=8)
+        self.det_angle.set("90"); self.det_angle.pack(side="left", padx=10)
+        
+        # Желтая панель ручного САПР-ввода геометрических параметров
+        self.man_det_frame = ttk.LabelFrame(left, text=" Ручной ввод геометрических параметров заготовки ")
+        self.man_det_frame.pack(fill="x", padx=10, pady=6)
+        
+        ttk.Label(self.man_det_frame, text="Внешний диаметр D, мм:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.det_manual_d = tk.Entry(self.man_det_frame, width=10, bg="#fff2cc", justify="center")
+        self.det_manual_d.insert(0, "159"); self.det_manual_d.grid(row=0, column=1, padx=5, pady=5)
+        
+        ttk.Label(self.man_det_frame, text="Толщина стенки s, мм:").grid(row=0, column=2, padx=10, pady=5, sticky="w")
+        self.det_manual_s = tk.Entry(self.man_det_frame, width=10, bg="#fff2cc", justify="center")
+        self.det_manual_s.insert(0, "5"); self.det_manual_s.grid(row=0, column=3, padx=5, pady=5)
+        
+        # Специальное поле для воротниковых фланцев
+        self.lbl_flange_dy = ttk.Label(left, text="Для фланцев - условный проход Ду (DN):")
+        self.det_flange_dy = ttk.Combobox(left, values=["Ду50", "Ду80", "Ду100", "Ду150", "Ду200", "Ду250", "Ду300", "Ду400", "Ду500", "Ду600", "Ду800", "Ду1000"], state="readonly")
+        self.det_flange_dy.set("Ду150")
+        
+        ttk.Label(left, text="Общий объем партии, шт:").pack(anchor="w", padx=10, pady=2)
+        self.det_cnt = ttk.Entry(left); self.det_cnt.insert(0, "10"); self.det_cnt.pack(fill="x", padx=10, pady=4)
+        
+        ttk.Button(left, text="Посчитать точную массу по ГОСТ/ТУ", command=self.proc_detali_calc).pack(fill="x", padx=10, pady=10)
+        
+        self.det_output = tk.Text(tab, bg="#ffffff", font=("Consolas", 10), bd=1, relief="solid")
+        self.det_output.pack(side="right", fill="both", expand=True, padx=15, pady=15)
+        self.toggle_detali_widgets_view()
+
     def toggle_detali_widgets_view(self, event=None):
         t = self.det_type.get()
         if "Фланец" in t:
@@ -385,34 +378,34 @@ class MetallistProApp:
             except:
                 messagebox.showerror("Ошибка", "Проверить числовой ввод Диаметра и Стенки отвода!"); return
                 
-            # Дифференциация радиусов кривизны оси отвода по стандартам СГК
-            if "17375" in t:
-                # Отводы типа 3D (Радиус изгиба R ≈ 1.5 * DN)
-                R_bend = 1.5 * D
-                st_name = "ГОСТ 17375-2001 (Тип 3D крутоизогнутый)"
-            elif "30753" in t:
-                # Отводы типа 2D (Укороченный радиус R ≈ 1.0 * DN для камер ТЭЦ)
-                R_bend = 1.0 * D
-                st_name = "ГОСТ 30753-2001 (Тип 2D укороченный)"
-            elif "51-515" in t:
-                # Промысловые хладостойкие отводы ТУ
-                R_bend = 1.375 * D
-                st_name = "ТУ 51-515-91 (Промысловый хладостойкий)"
+            gost_weights_90 = {
+                (57.0, 3.5, "17375"): 0.7, (89.0, 4.0, "17375"): 2.1, (108.0, 4.0, "17375"): 3.3,
+                (159.0, 5.0, "17375"): 8.1, (219.0, 6.0, "17375"): 17.2, (273.0, 7.0, "17375"): 33.5,
+                (325.0, 8.0, "17375"): 51.4, (426.0, 9.0, "17375"): 98.6, (530.0, 10.0, "17375"): 173.0,
+                (57.0, 3.5, "30753"): 0.5, (89.0, 4.0, "30753"): 1.4, (108.0, 4.0, "30753"): 2.1,
+                (159.0, 5.0, "30753"): 5.3, (219.0, 6.0, "30753"): 11.4, (273.0, 7.0, "30753"): 21.6,
+                (325.0, 8.0, "30753"): 33.1, (426.0, 9.0, "30753"): 63.8, (530.0, 10.0, "30753"): 111.0
+            }
+            
+            gost_key = "17375" if "17375" in t else "30753" if "30753" in t else "TU"
+            
+            if (D, s, gost_key) in gost_weights_90:
+                base_w_90 = gost_weights_90[(D, s, gost_key)]
+                w_unit = (base_w_90 / 90.0) * angle_val * (rho / 7.85)
+                st_name = "ГОСТ 17375" if gost_key == "17375" else "ГОСТ 30753"
+                desc_str = f"Табличный {st_name} (СГК-База), угол {int(angle_val)}°, ∅{D}х{s} мм"
             else:
-                # Магистральные гнутые длинные отводы ГОСТ 24950-81 (Огромный радиус, базовый = 15 метров)
-                R_bend = 15000.0
-                st_name = "ГОСТ 24950-81 (Магистральный длинногнутый)"
+                if "17375" in t: R_bend = 1.5 * D
+                elif "30753" in t: R_bend = 1.0 * D
+                elif "51-515" in t: R_bend = 1.375 * D
+                else: R_bend = 15000.0
                 
-            # Теоретическая формула объема вытесненного металла кругового тора под заданный угол:
-            # V = (угол / 360) * (2 * pi^2 * R_изгиба * средний_радиус_трубы * s)
-            V_metal = (angle_val / 360.0) * (2.0 * (math.pi ** 2) * R_bend * ((D - s) / 2.0) * s)
-            
-            # Технологическая поправка на утолщение стенки на внутреннем радиусе по ТУ
-            if "51-515" in t: V_metal *= 1.06
-            
-            # Масса заготовки в кг с учетом плотности текущей сессии
-            w_unit = (V_metal / 1000.0) * (rho / 7.85)
-            desc_str = f"{st_name}, угол {int(angle_val)}°, сечение ∅{D}х{s} мм"
+                V_metal_dm3 = ((angle_val / 360.0) * (2.0 * (math.pi ** 2) * R_bend * ((D - s) / 2.0) * s)) / 1000000.0
+                if "51-515" in t: V_metal_dm3 *= 1.06
+                
+                w_unit = V_metal_dm3 * rho
+                st_name = "ГОСТ 24950" if "24950" in t else "ТУ 51-515" if "51-515" in t else "Нестандартный ГОСТ"
+                desc_str = f"Геометрический САПР-расчет ({st_name}), угол {int(angle_val)}°, ∅{D}х{s} мм"
             
         total = w_unit * c
         self.det_output.delete("1.0", "end")
