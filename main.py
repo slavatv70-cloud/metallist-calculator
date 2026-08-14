@@ -1,3 +1,4 @@
+import openpyxl  # Перенесено наверх, чтобы PyInstaller точно заметил библиотеку
 import os
 import sys
 import tkinter as tk
@@ -15,7 +16,6 @@ class BudgetCheckerGUI:
         self.init_interface()
 
     def init_interface(self):
-        # Используем стандартный стиль без вызова сбойной темы 'vista'
         main_frame = ttk.Frame(self.root, padding="25")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
@@ -38,7 +38,6 @@ class BudgetCheckerGUI:
 
     def _save_real_excel(self, path, title, headers, rows):
         """Создает настоящий, чистый файл XLSX без предупреждений безопасности"""
-        import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         
         wb = openpyxl.Workbook()
@@ -78,7 +77,6 @@ class BudgetCheckerGUI:
             return
             
         try:
-            # Находим папку, где запущен EXE-файл
             exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
             
             # ФАЙЛ 1: Детальный анализ
