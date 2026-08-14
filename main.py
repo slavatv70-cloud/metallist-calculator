@@ -15,7 +15,7 @@ class BudgetCheckerGUI:
         self.init_interface()
 
     def init_interface(self):
-        # Используем стандартный Frame без вызова конфликтующей темы 'vista'
+        # Используем стандартный стиль без вызова сбойной темы 'vista'
         main_frame = ttk.Frame(self.root, padding="25")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
@@ -78,6 +78,7 @@ class BudgetCheckerGUI:
             return
             
         try:
+            # Находим папку, где запущен EXE-файл
             exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
             
             # ФАЙЛ 1: Детальный анализ
