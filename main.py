@@ -1,6 +1,7 @@
-import openpyxl  # Перенесено наверх, чтобы PyInstaller точно заметил библиотеку
 import os
 import sys
+import xml.etree.ElementTree as ET
+import zipfile
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -36,39 +37,51 @@ class BudgetCheckerGUI:
         
         ttk.Button(main_frame, text="Запустить сверку документов", command=self.run_audit).pack(fill=tk.X, ipady=5)
 
-    def _save_real_excel(self, path, title, headers, rows):
-        """Создает настоящий, чистый файл XLSX без предупреждений безопасности"""
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    def _create_xlsx_native(self, filename, title, headers, rows):
+        """Создает настоящий стандартный .xlsx файл с нуля без внешних библиотек"""
         
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Анализ"
-        ws.views.sheetView.showGridLines = True
+        # Минимальная XML-структура ячеек листа
+        sheet_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        sheet_xml += '<worksheet xmlns="http://openxmlformats.org">'
+        sheet_xml += '<sheetData>'
         
-        ws["A1"] = title
-        ws["A1"].font = Font(name="Arial", size=11, bold=True, color="1F497D")
-        ws.append([])
-        ws.append(headers)
+        # 1. Заголовок отчета (Строка 1)
+        sheet_xml += '<row r="1"><cell r="A1" t="inline"><inlineStr><t>' + title + '</t></inlineStr></cell></row>'
+        sheet_xml += '<row r="2"></row>'  # Пустая строка для отступа
         
-        for r in rows:
-            ws.append(r)
-            
-        bd = Border(left=Side(style='thin', color='BFBFBF'), right=Side(style='thin', color='BFBFBF'), top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF'))
-        for r_idx, row in enumerate(ws.iter_rows(min_row=3, max_row=ws.max_row), start=3):
-            for cell in row:
-                cell.border = bd
-                if r_idx == 3:
-                    cell.font = Font(name="Arial", size=9, bold=True, color="FFFFFF")
-                    cell.fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
-                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        # 2. Шапка таблицы (Строка 3)
+        sheet_xml += '<row r="3">'
+        for col_idx, h in enumerate(headers):
+            col_letter = chr(65 + col_idx)
+            sheet_xml += f'<c r="{col_letter}3" t="inline"><is><t>{h}</t></is></c>'
+        sheet_xml += '</row>'
+        
+        # 3. Данные (Строка 4+)
+        for row_idx, row in enumerate(rows, start=4):
+            sheet_xml += f'<row r="{row_idx}">'
+            for col_idx, val in enumerate(row):
+                col_letter = chr(65 + col_idx)
+                if isinstance(val, (int, float)):
+                    sheet_xml += f'<c r="{col_letter}{row_idx}"><v>{val}</v></c>'
                 else:
-                    cell.font = Font(name="Arial", size=9)
-                    cell.alignment = Alignment(horizontal="left" if cell.column == 2 else "center", vertical="center", wrap_text=True)
-                    
-        for col in ws.columns:
-            max_len = max(len(str(c.value or '')) for c in col)
-            ws.column_dimensions[openpyxl.utils.get_column_letter(col.column)].width = max(max_len + 3, 12)
-        wb.save(path)
+                    sheet_xml += f'<c r="{col_letter}{row_idx}" t="inline"><is><t>{str(val)}</t></is></c>'
+            sheet_xml += '</row>'
+            
+        sheet_xml += '</sheetData></worksheet>'
+
+        # Шаблонные служебные файлы структуры OpenXML (.xlsx)
+        content_types = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://openxmlformats.org"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'
+        rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://openxmlformats.org"><Relationship Id="rId1" Type="http://openxmlformats.org" Target="xl/workbook.xml"/></Relationships>'
+        workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://openxmlformats.org" xmlns:r="http://openxmlformats.org"><sheets><sheet name="Анализ" sheetId="1" r:id="rId1"/></sheets></workbook>'
+        xl_rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://openxmlformats.org"><Relationship Id="rId1" Type="http://openxmlformats.org/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'
+
+        # Упаковываем все XML компоненты в единый ZIP-архив с расширением .xlsx
+        with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as z:
+            z.writestr('[Content_Types].xml', content_types)
+            z.writestr('_rels/.rels', rels)
+            z.writestr('xl/workbook.xml', workbook)
+            z.writestr('xl/_rels/workbook.xml.rels', xl_rels)
+            z.writestr('xl/worksheets/sheet1.xml', sheet_xml)
 
     def run_audit(self):
         client, contractor = self.client_file_path.get(), self.contractor_file_path.get()
@@ -77,6 +90,7 @@ class BudgetCheckerGUI:
             return
             
         try:
+            # Находим директорию запуска EXE
             exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
             
             # ФАЙЛ 1: Детальный анализ
@@ -86,7 +100,7 @@ class BudgetCheckerGUI:
                 ["26415-020102-0", "Ремонт лакокрасочного покрытия: на 1-й слой 20м.кв.", 2.16, 2.15, -0.01, "Изменение объемов"],
                 ["8415-000200-0101", "Ремонт лакокрасочного покрытия на каждый последующий", 2.18, 2.18, 0.00, "Совпадает"]
             ]
-            self._save_real_excel(f1, "1. Детальный анализ изменений по позициям сметы", h1, r1)
+            self._create_xlsx_native(f1, "1. Детальный анализ изменений по позициям сметы", h1, r1)
             
             # ФАЙЛ 2: Заключение по смете
             f2 = os.path.join(exe_dir, "2. Заключение по смете №.xlsx")
@@ -95,7 +109,7 @@ class BudgetCheckerGUI:
                 ["ООО Интегра", "V311.ТОИР.ХЦ.2025.0061", "Да", "Соответствует полностью"],
                 ["ООО Капитал", "V311.ТОИР.ХЦ.2025.0061", "Нет", "1. Изменение объемов: 10. 2. Изменение стоимости."]
             ]
-            self._save_real_excel(f2, "2. Заключение по проверке смет участников закупки", h2, r2)
+            self._create_xlsx_native(f2, "2. Заключение по проверке смет участников закупки", h2, r2)
             
             # ФАЙЛ 3: Сводный анализ
             f3 = os.path.join(exe_dir, "3. Сводный анализ по смете №.xlsx")
@@ -105,7 +119,7 @@ class BudgetCheckerGUI:
                 ["Сметная трудоёмкость", 27.07, 27.07, 0.00, "Совпадает"],
                 ["Стоимость с НДС", 24212.03, 25052.03, 840.00, "Превышение бюджета"]
             ]
-            self._save_real_excel(f3, "3. Сводный аналитический отчет по затратам", h3, r3)
+            self._create_xlsx_native(f3, "3. Сводный аналитический отчет по затратам", h3, r3)
             
             messagebox.showinfo("Успех", f"Выгрузка завершена!\n3 файла (.xlsx) успешно созданы в папке с программой:\n{exe_dir}")
             os.system(f'explorer "{os.path.normpath(exe_dir)}"')
