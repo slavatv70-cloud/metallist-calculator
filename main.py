@@ -1,15 +1,7 @@
 import os
 import sys
-import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-
-# Автоматическая установка необходимых библиотек прямо при запуске
-try:
-    import openpyxl
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
-    import openpyxl
 
 class BudgetCheckerGUI:
     def __init__(self, root):
@@ -23,9 +15,7 @@ class BudgetCheckerGUI:
         self.init_interface()
 
     def init_interface(self):
-        style = ttk.Style()
-        style.theme_use('vista')
-        
+        # Используем стандартный Frame без вызова конфликтующей темы 'vista'
         main_frame = ttk.Frame(self.root, padding="25")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
@@ -48,7 +38,9 @@ class BudgetCheckerGUI:
 
     def _save_real_excel(self, path, title, headers, rows):
         """Создает настоящий, чистый файл XLSX без предупреждений безопасности"""
+        import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Анализ"
