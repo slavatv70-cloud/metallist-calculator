@@ -1,8 +1,15 @@
 import os
 import sys
-import re
+import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+
+# Автоматическая установка необходимых библиотек прямо при запуске
+try:
+    import openpyxl
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+    import openpyxl
 
 class BudgetCheckerGUI:
     def __init__(self, root):
@@ -39,37 +46,38 @@ class BudgetCheckerGUI:
         
         ttk.Button(main_frame, text="Запустить сверку документов", command=self.run_audit).pack(fill=tk.X, ipady=5)
 
-    def _save_xml_excel(self, path, title, headers, rows):
-        """Создает полноценный Excel-файл (XML-формат), используя только встроенный Python"""
-        xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-        <?mso-application progid="Excel.Sheet"?>
-        <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-                  xmlns:o="urn:schemas-microsoft-com:office:office"
-                  xmlns:x="urn:schemas-microsoft-com:office:excel"
-                  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
-                  xmlns:html="http://w3.org">
-          <Styles>
-            <Style ss:ID="Title"><Font ss:Name="Arial" ss:Size="12" ss:Bold="1" ss:Color="#1F497D"/></Style>
-            <Style ss:ID="Header"><Font ss:Name="Arial" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1F497D" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/></Style>
-            <Style ss:ID="Cell"><Font ss:Name="Arial" ss:Size="10"/><Alignment ss:Vertical="Center" ss:WrapText="1"/></Style>
-          </Styles>
-          <Worksheet ss:Name="Анализ">
-            <Table>
-              <Row><Cell ss:StyleID="Title"><Data ss:Type="String">{title}</Data></Cell></Row>
-              <Row></Row>
-              <Row ss:Height="25">"""
-        for h in headers:
-            xml_content += f'<Cell ss:StyleID="Header"><Data ss:Type="String">{h}</Data></Cell>'
-        xml_content += "</Row>"
-        for row in rows:
-            xml_content += "<Row>"
+    def _save_real_excel(self, path, title, headers, rows):
+        """Создает настоящий, чистый файл XLSX без предупреждений безопасности"""
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Анализ"
+        ws.views.sheetView.showGridLines = True
+        
+        ws["A1"] = title
+        ws["A1"].font = Font(name="Arial", size=11, bold=True, color="1F497D")
+        ws.append([])
+        ws.append(headers)
+        
+        for r in rows:
+            ws.append(r)
+            
+        bd = Border(left=Side(style='thin', color='BFBFBF'), right=Side(style='thin', color='BFBFBF'), top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF'))
+        for r_idx, row in enumerate(ws.iter_rows(min_row=3, max_row=ws.max_row), start=3):
             for cell in row:
-                t = "Number" if isinstance(cell, (int, float)) else "String"
-                xml_content += f'<Cell ss:StyleID="Cell"><Data ss:Type="{t}">{cell}</Data></Cell>'
-            xml_content += "</Row>"
-        xml_content += "</Table></Worksheet></Workbook>"
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(xml_content)
+                cell.border = bd
+                if r_idx == 3:
+                    cell.font = Font(name="Arial", size=9, bold=True, color="FFFFFF")
+                    cell.fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                else:
+                    cell.font = Font(name="Arial", size=9)
+                    cell.alignment = Alignment(horizontal="left" if cell.column == 2 else "center", vertical="center", wrap_text=True)
+                    
+        for col in ws.columns:
+            max_len = max(len(str(c.value or '')) for c in col)
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col.column)].width = max(max_len + 3, 12)
+        wb.save(path)
 
     def run_audit(self):
         client, contractor = self.client_file_path.get(), self.contractor_file_path.get()
@@ -78,38 +86,37 @@ class BudgetCheckerGUI:
             return
             
         try:
-            # Находим папку, где запущен EXE-файл
             exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
             
             # ФАЙЛ 1: Детальный анализ
-            f1 = os.path.join(exe_dir, "1. Детальный анализ по смете №.xls")
+            f1 = os.path.join(exe_dir, "1. Детальный анализ по смете №.xlsx")
             h1 = ["Шифр", "Наименование работ / затрат", "Объем Заказчика", "Объем Подрядчика", "Отклонение", "Статус"]
             r1 = [
                 ["26415-020102-0", "Ремонт лакокрасочного покрытия: на 1-й слой 20м.кв.", 2.16, 2.15, -0.01, "Изменение объемов"],
                 ["8415-000200-0101", "Ремонт лакокрасочного покрытия на каждый последующий", 2.18, 2.18, 0.00, "Совпадает"]
             ]
-            self._save_xml_excel(f1, "1. Детальный анализ изменений по позициям сметы", h1, r1)
+            self._save_real_excel(f1, "1. Детальный анализ изменений по позициям сметы", h1, r1)
             
             # ФАЙЛ 2: Заключение по смете
-            f2 = os.path.join(exe_dir, "2. Заключение по смете №.xls")
+            f2 = os.path.join(exe_dir, "2. Заключение по смете №.xlsx")
             h2 = ["Наименование участника закупки", "№ сметы", "Соответствие смете (Да/Нет)", "Краткое описание отличий"]
             r2 = [
                 ["ООО Интегра", "V311.ТОИР.ХЦ.2025.0061", "Да", "Соответствует полностью"],
                 ["ООО Капитал", "V311.ТОИР.ХЦ.2025.0061", "Нет", "1. Изменение объемов: 10. 2. Изменение стоимости."]
             ]
-            self._save_xml_excel(f2, "2. Заключение по проверке смет участников закупки", h2, r2)
+            self._save_real_excel(f2, "2. Заключение по проверке смет участников закупки", h2, r2)
             
             # ФАЙЛ 3: Сводный анализ
-            f3 = os.path.join(exe_dir, "3. Сводный анализ по смете №.xls")
+            f3 = os.path.join(exe_dir, "3. Сводный анализ по смете №.xlsx")
             h3 = ["Показатель", "Смета АО ГРЭС (Заказчик)", "Смета Подрядчика", "Отклонение", "Статус"]
             r3 = [
                 ["Стоимость материалов", 1908.63, 1908.63, 0.00, "Совпадает"],
                 ["Сметная трудоёмкость", 27.07, 27.07, 0.00, "Совпадает"],
                 ["Стоимость с НДС", 24212.03, 25052.03, 840.00, "Превышение бюджета"]
             ]
-            self._save_xml_excel(f3, "3. Сводный аналитический отчет по затратам", h3, r3)
+            self._save_real_excel(f3, "3. Сводный аналитический отчет по затратам", h3, r3)
             
-            messagebox.showinfo("Успех", f"Выгрузка завершена!\n3 файла (.xls) успешно созданы в папке с программой:\n{exe_dir}")
+            messagebox.showinfo("Успех", f"Выгрузка завершена!\n3 файла (.xlsx) успешно созданы в папке с программой:\n{exe_dir}")
             os.system(f'explorer "{os.path.normpath(exe_dir)}"')
             
         except Exception as e:
